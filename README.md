@@ -32,3 +32,12 @@ Este repositorio todavía no contiene `android/`, Gradle Wrapper ni `AndroidMani
 ## Seguridad y separación
 
 La función `youtube-feed` es independiente de `gestionar-usuarios`; el despliegue de YouTube no modifica tablas ni reemplaza la función anterior. No colocar `service_role` ni la clave de YouTube en el cliente Android.
+
+
+## Compilación automática de APK
+
+El workflow `.github/workflows/build-apk.yml` compila una APK Android de depuración en GitHub Actions cuando se actualiza `main`, cuando se abre/actualiza un pull request hacia `main`, o manualmente desde Actions. La salida se publica como artefacto `viejitos-debug-apk` durante 30 días. La compilación usa React Native 0.81.5, JDK 17, Gradle 8.14.3 y Android SDK 36. El identificador Android es `com.viejitos` y la actividad se registra como lanzador y candidata a pantalla HOME; Android todavía requiere que la persona elija Viejitos como aplicación de inicio.
+
+Esta automatización genera una APK de depuración firmada con la clave de depuración efímera de CI. No es una APK de publicación firmada para Play Store. Para distribución pública se debe configurar una clave de firma privada mediante GitHub Secrets y un flujo release separado.
+
+La compilación de la APK no significa que estén terminadas las integraciones nativas de contactos, notificaciones, llamadas, linterna o radio FM; esas limitaciones siguen descritas arriba.
