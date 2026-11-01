@@ -89,8 +89,9 @@ android {
         debug {
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
+            // CI test APKs use the Android debug keystore so they are directly installable.
+            // Replace this with a private release keystore before Play Store distribution.
+            signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
