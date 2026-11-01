@@ -5,7 +5,8 @@
   "scripts": {
     "android": "react-native run-android",
     "start": "react-native start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:android:debug": "cd android && gradle assembleDebug"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
