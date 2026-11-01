@@ -44,7 +44,7 @@ jobs:
       - name: Configure Android SDK
         shell: bash
         run: |
-          set -euo pipefail
+          set -eu
           : "${ANDROID_HOME:=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
@@ -54,7 +54,7 @@ jobs:
             exit 1
           fi
           echo "Using $SDKMANAGER"
-          yes | "$SDKMANAGER" --licenses >/dev/null
+          yes 2>/dev/null | "$SDKMANAGER" --licenses >/dev/null
           "$SDKMANAGER" --install \
             "platform-tools" \
             "platforms;android-36" \
