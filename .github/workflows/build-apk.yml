@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build-standalone-apk:
-    name: Build standalone Viejitos APK
+    name: Build standalone FerOs abues APK
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -87,7 +87,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: viejitos-standalone-apk
+          name: feros-abues-standalone-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
