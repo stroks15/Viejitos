@@ -27,7 +27,7 @@ Repositorio: https://github.com/stroks15/Viejitos
 
 ## Trabajo nativo pendiente antes de distribuir un APK
 
-Este repositorio todavía no contiene `android/`, Gradle Wrapper ni `AndroidManifest.xml`; por eso no es aún un proyecto Android compilable ni se pudo producir un APK aquí. También falta implementar y probar en dispositivo las integraciones nativas de launcher HOME, contactos reales, notificaciones mediante Notification Listener, llamadas, linterna, radio FM y apertura de aplicaciones instaladas. Los accesos de esas funciones que aún no tienen módulo nativo se muestran como pendientes y no deben anunciarse como funcionales.
+El repositorio ya contiene el proyecto Android nativo (`android/`), `AndroidManifest.xml` y Gradle Wrapper alineado con la plantilla oficial de React Native 0.81.5. La compilación de CI verifica que ese esqueleto genere una APK; no equivale a completar todas las integraciones nativas. Siguen pendientes la lectura de contactos reales y sus 24 posiciones, notificaciones mediante Notification Listener, integración de llamadas como app de teléfono/ROLE_DIALER, linterna, radio FM y apertura/administración de aplicaciones instaladas. No se debe anunciar como funcional una integración que aún no tenga módulo nativo y prueba en dispositivo.
 
 ## Seguridad y separación
 
@@ -36,8 +36,8 @@ La función `youtube-feed` es independiente de `gestionar-usuarios`; el desplieg
 
 ## Compilación automática de APK
 
-El workflow `.github/workflows/build-apk.yml` compila una APK Android de depuración en GitHub Actions cuando se actualiza `main`, cuando se abre/actualiza un pull request hacia `main`, o manualmente desde Actions. La salida se publica como artefacto `viejitos-debug-apk` durante 30 días. La compilación usa React Native 0.81.5, JDK 17, Gradle 8.14.3 y Android SDK 36. El identificador Android es `com.viejitos` y la actividad se registra como lanzador y candidata a pantalla HOME; Android todavía requiere que la persona elija Viejitos como aplicación de inicio.
+El workflow `.github/workflows/build-apk.yml` compila una APK Android de depuración en GitHub Actions cuando se actualiza `main`, cuando se abre/actualiza un pull request hacia `main`, o manualmente desde Actions. La salida se publica como artefacto `viejitos-debug-apk` durante 30 días. La compilación usa React Native 0.81.5, Node 20.19.4, JDK 17, Gradle Wrapper 8.14.3 y Android SDK 36. El workflow usa los command-line tools ya instalados en el runner y llama directamente a `sdkmanager`; no usa `android-actions/setup-android@v3`, cuya instalación intentaba instalar el paquete retirado `tools` y detenía el job antes de compilar. El identificador Android es `com.viejitos` y la actividad se registra como lanzador y candidata a pantalla HOME; Android todavía requiere que la persona elija Viejitos como aplicación de inicio.
 
-Esta automatización genera una APK de depuración firmada con la clave de depuración efímera de CI. No es una APK de publicación firmada para Play Store. Para distribución pública se debe configurar una clave de firma privada mediante GitHub Secrets y un flujo release separado.
+La compilación se ejecuta desde el wrapper versionado (`android/gradlew`), para que local y CI utilicen la misma distribución de Gradle. Esta automatización genera una APK de depuración firmada con la clave de depuración efímera de CI. No es una APK de publicación firmada para Play Store. Para distribución pública se debe configurar una clave de firma privada mediante GitHub Secrets y un flujo release separado.
 
 La compilación de la APK no significa que estén terminadas las integraciones nativas de contactos, notificaciones, llamadas, linterna o radio FM; esas limitaciones siguen descritas arriba.
