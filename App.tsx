@@ -5,7 +5,9 @@ import Tts from 'react-native-tts';
 
 type Video={videoId:string;title:string;publishedAt:string;thumbnail:string};
 type Feed={channelTitle:string;videos:Video[]};
-const EMPTY_CHANNELS=['','',''];
+const MAX_CHANNELS=3;
+const VIDEOS_PER_CHANNEL=3;
+const EMPTY_CHANNELS=Array.from({length:MAX_CHANNELS},()=> '');
 const COLORS=['#1976D2','#168C82','#7955A5','#D18B16','#C04F36','#D52B2B','#526B8A','#59636F'];
 const APPS=[['LLAMAR','☎'],['MENSAJES','✉'],['CONTACTOS','●'],['WHATSAPP','◉'],['LINTERNA','☼'],['RADIO','♫'],['YOUTUBE','▶'],['CALCULADORA','▦'],['CÁMARA','▣']];
 const say=(s:string)=>{Tts.setDefaultLanguage('es-MX').catch(()=>{});Tts.speak(s);};
@@ -16,14 +18,14 @@ export default function App(){
  const [font,setFont]=useState(24),[contrast,setContrast]=useState(false),[voice,setVoice]=useState(true),[time,setTime]=useState(new Date());
  const scroll=useRef<ScrollView>(null),width=Dimensions.get('window').width;
  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),1000);return()=>clearInterval(t);},[]);
- useEffect(()=>{AsyncStorage.multiGet(['yt.channels','yt.endpoint','yt.anon','font','contrast','voice']).then(rows=>{const v=Object.fromEntries(rows);if(v['yt.channels'])setChannels(JSON.parse(v['yt.channels']!).slice(0,3));if(v['yt.endpoint'])setEndpoint(v['yt.endpoint']!);if(v['yt.anon'])setAnon(v['yt.anon']!);if(v.font)setFont(Number(v.font));if(v.contrast)setContrast(v.contrast==='true');if(v.voice)setVoice(v.voice==='true');}).catch(()=>{});},[]);
+ useEffect(()=>{AsyncStorage.multiGet(['yt.channels','yt.endpoint','yt.anon','font','contrast','voice']).then(rows=>{const v=Object.fromEntries(rows);if(v['yt.channels']){const saved=JSON.parse(v['yt.channels']!);setChannels(Array.from({length:MAX_CHANNELS},(_,i)=>typeof saved[i]==='string'?saved[i]:''));}if(v['yt.endpoint'])setEndpoint(v['yt.endpoint']!);if(v['yt.anon'])setAnon(v['yt.anon']!);if(v.font)setFont(Number(v.font));if(v.contrast)setContrast(v.contrast==='true');if(v.voice)setVoice(v.voice==='true');}).catch(()=>{});},[]);
  useEffect(()=>{AsyncStorage.multiSet([['yt.channels',JSON.stringify(channels)],['yt.endpoint',endpoint],['yt.anon',anon],['font',String(font)],['contrast',String(contrast)],['voice',String(voice)]]).catch(()=>{});},[channels,endpoint,anon,font,contrast,voice]);
  useEffect(()=>{const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(page){go(0);return true;}return true;});return()=>sub.remove();},[page]);
  const go=(n:number)=>{const p=Math.max(0,Math.min(4,n));setPage(p);scroll.current?.scrollTo({x:p*width,animated:true});};
  const refresh=async()=>{
   if(!endpoint.trim()){Alert.alert('Falta configurar videos','En Configuración agrega la URL de la función segura de Supabase.');return;}
   const entries=channels.map((url,index)=>({url:url.trim(),index})).filter(x=>x.url);if(!entries.length)return;
-  setBusy(true);try{const rows=await Promise.all(entries.map(async x=>{const r=await fetch(endpoint.trim(),{method:'POST',headers:{'Content-Type':'application/json','apikey':anon,'Authorization':`Bearer ${anon}`},body:JSON.stringify({channelUrl:x.url,limit:3})});const data=await r.json();if(!r.ok)throw new Error(data.error||`Canal ${x.index+1}: HTTP ${r.status}`);return [x.index,{channelTitle:data.channelTitle||`CANAL ${x.index+1}`,videos:Array.isArray(data.videos)?data.videos.slice(0,3):[]}] as const;}));setFeeds(Object.fromEntries(rows));}
+  setBusy(true);try{const rows=await Promise.all(entries.map(async x=>{const r=await fetch(endpoint.trim(),{method:'POST',headers:{'Content-Type':'application/json','apikey':anon,'Authorization':`Bearer ${anon}`},body:JSON.stringify({channelUrl:x.url,limit:VIDEOS_PER_CHANNEL})});const data=await r.json();if(!r.ok)throw new Error(data.error||`Canal ${x.index+1}: HTTP ${r.status}`);return [x.index,{channelTitle:data.channelTitle||`CANAL ${x.index+1}`,videos:Array.isArray(data.videos)?data.videos.slice(0,VIDEOS_PER_CHANNEL):[]}] as const;}));setFeeds(Object.fromEntries(rows));}
   catch(e){Alert.alert('No se pudieron cargar los videos',e instanceof Error?e.message:'Revisa tu conexión.');}finally{setBusy(false);}
  };
  useEffect(()=>{if(page===3&&channels.some(x=>x.trim())&&endpoint.trim())refresh();},[page,channels,endpoint]);
@@ -44,7 +46,45 @@ export default function App(){
    </View>
    <View style={{width,padding:16}}>{title('CONTACTOS')}<Text style={{color:muted,marginBottom:14}}>24 espacios · seis por página</Text><View style={styles.grid}>{Array.from({length:6},(_,i)=><TouchableOpacity key={i} style={[styles.contact,{backgroundColor:COLORS[i%4]}]} onPress={()=>say(`Contacto ${i+1})}><Text style={styles.contactText}>Contacto {i+1}</Text></TouchableOpacity>)}</View><Text style={{color:muted,marginTop:14}}>La agenda completa se conectará a los contactos del teléfono.</Text></View>
    <View style={{width,padding:16}}>{title('WHATSAPP')}<Text style={{color:muted}}>Conversaciones recientes disponibles al conceder acceso a notificaciones.</Text><View style={[styles.card,{backgroundColor:card,marginTop:16}]}><Text style={{color:fg}}>Aquí aparecerán las conversaciones recibidas, con su nombre y vista previa cuando Android las permita.</Text></View></View>
-   <ScrollView style={{width}} contentContainerStyle={{padding:16}}>{title('VIDEOS')}<Text style={{color:muted,marginBottom:14}}>Tres espacios para tus canales favoritos. Cada uno muestra sus tres videos más recientes.</Text>{channels.map((url,i)=>url?<View key={i} style={[styles.channel,{backgroundColor:card}]}><View style={styles.channelHead}><View style={{flex:1}}><Text style={[styles.channelTitle,{color:fg}]}>{feeds[i]?.channelTitle||`CANAL ${i+1}`}</Text><Text style={{color:muted,fontSize:11}} numberOfLines={1}>{url}</Text></View><TouchableOpacity style={styles.edit} onPress={()=>{setEdit(i);setDraft(url);}}><Text style={styles.white}>EDITAR</Text></TouchableOpacity></View>{feeds[i]?.videos?.slice(0,3).map((v,j)=><TouchableOpacity key={v.videoId} style={styles.video} onPress={()=>openVideo(v.videoId)}><Image source={{uri:v.thumbnail}} style={styles.thumb}/><View style={{flex:1}}><Text style={{color:fg,fontWeight:'900'}} numberOfLines={2}>{v.title}</Text><Text style={{color:muted,fontSize:11}}>{j===0?'MÁS RECIENTE':`ANTERIOR ${j}`} · {new Date(v.publishedAt).toLocaleDateString('es-MX')}</Text></View><Text style={{color:'#D52B2B',fontSize:25}}>▶</Text></TouchableOpacity>)||<Text style={{color:muted,marginTop:12}}>Pulsa ACTUALIZAR para consultar los videos.</Text>}</View>:<TouchableOpacity key={i} style={[styles.plusCard,{backgroundColor:card}]} onPress={()=>{setEdit(i);setDraft('');}}><Text style={styles.plus}>＋</Text><Text style={[styles.channelTitle,{color:fg}]}>AGREGAR CANAL {i+1}</Text><Text style={{color:muted}}>Pega el enlace de YouTube</Text></TouchableOpacity>)}{busy?<ActivityIndicator size="large" color="#D52B2B"/>:null}<TouchableOpacity style={styles.refresh} onPress={refresh}><Text style={styles.white}>ACTUALIZAR VIDEOS</Text></TouchableOpacity></ScrollView>
+   <ScrollView style={{width}} contentContainerStyle={{padding:16}}>
+    {title('VIDEOS')}
+    <Text style={{color:muted,marginBottom:14}}>Agrega hasta tres canales. Cada espacio ＋ acepta un enlace y muestra automáticamente sus tres videos más recientes, primero el nuevo y después los dos anteriores.</Text>
+    {channels.map((url,i)=>{
+     const feed=feeds[i];
+     const videos=feed?.videos?.slice(0,VIDEOS_PER_CHANNEL)||[];
+     return url.trim()?(
+      <View key={i} style={[styles.channel,{backgroundColor:card}]}>
+       <View style={styles.channelHead}>
+        <View style={{flex:1}}>
+         <Text style={[styles.channelTitle,{color:fg}]}>{feed?.channelTitle||`CANAL ${i+1}`}</Text>
+         <Text style={{color:muted,fontSize:11}} numberOfLines={1}>{url}</Text>
+        </View>
+        <TouchableOpacity style={styles.edit} onPress={()=>{setEdit(i);setDraft(url);}}>
+         <Text style={styles.white}>EDITAR</Text>
+        </TouchableOpacity>
+       </View>
+       {videos.length>0?videos.map((v,j)=>(
+        <TouchableOpacity key={v.videoId} style={styles.video} onPress={()=>openVideo(v.videoId)}>
+         <Image source={{uri:v.thumbnail}} style={styles.thumb}/>
+         <View style={{flex:1}}>
+          <Text style={{color:fg,fontWeight:'900'}} numberOfLines={2}>{v.title}</Text>
+          <Text style={{color:muted,fontSize:11}}>{j===0?'MÁS RECIENTE':`ANTERIOR ${j}`} · {new Date(v.publishedAt).toLocaleDateString('es-MX')}</Text>
+         </View>
+         <Text style={{color:'#D52B2B',fontSize:25}}>▶</Text>
+        </TouchableOpacity>
+       )):<Text style={{color:muted,marginTop:12}}>{busy?'Cargando los tres videos…':'No hay videos disponibles. Comprueba el enlace y la conexión.'}</Text>}
+      </View>
+     ):(
+      <TouchableOpacity key={i} style={[styles.plusCard,{backgroundColor:card}]} onPress={()=>{setEdit(i);setDraft('');}}>
+       <Text style={styles.plus}>＋</Text>
+       <Text style={[styles.channelTitle,{color:fg}]}>AGREGAR CANAL {i+1}</Text>
+       <Text style={{color:muted}}>Pulsa ＋ y pega el enlace de YouTube</Text>
+      </TouchableOpacity>
+     );
+    })}
+    {busy?<ActivityIndicator size="large" color="#D52B2B"/>:null}
+    <TouchableOpacity style={styles.refresh} onPress={refresh}><Text style={styles.white}>ACTUALIZAR VIDEOS</Text></TouchableOpacity>
+   </ScrollView>
    <ScrollView style={{width}} contentContainerStyle={{padding:16}}>{title('CONFIGURACIÓN')}<Text style={{color:muted,marginBottom:14}}>Ajustes sencillos y accesibles</Text><View style={[styles.card,{backgroundColor:card}]}><Text style={[styles.channelTitle,{color:fg}]}>Conexión de videos</Text><Text style={{color:muted,marginVertical:8}}>Configura la URL de la función Supabase y la clave pública anon. La clave secreta de YouTube nunca se guarda aquí.</Text><TextInput value={endpoint} onChangeText={setEndpoint} placeholder="URL de Supabase Edge Function" autoCapitalize="none" style={styles.input}/><TextInput value={anon} onChangeText={setAnon} placeholder="Clave pública anon de Supabase" autoCapitalize="none" style={styles.input}/><TouchableOpacity style={styles.refresh} onPress={refresh}><Text style={styles.white}>PROBAR CONEXIÓN</Text></TouchableOpacity></View><View style={[styles.card,{backgroundColor:card}]}><Text style={[styles.channelTitle,{color:fg}]}>Tamaño de letra</Text><View style={styles.row}><TouchableOpacity onPress={()=>setFont(Math.max(18,font-2))}><Text style={styles.adjust}>A−</Text></TouchableOpacity><Text style={{color:fg,fontSize:22}}>{font}</Text><TouchableOpacity onPress={()=>setFont(Math.min(36,font+2))}><Text style={styles.adjust}>A+</Text></TouchableOpacity></View></View><View style={[styles.card,{backgroundColor:card}]}><View style={styles.row}><Text style={[styles.channelTitle,{color:fg,flex:1}]}>Leer nombres en voz alta</Text><Switch value={voice} onValueChange={setVoice}/></View></View><View style={[styles.card,{backgroundColor:card}]}><View style={styles.row}><Text style={[styles.channelTitle,{color:fg,flex:1}]}>Alto contraste</Text><Switch value={contrast} onValueChange={setContrast}/></View></View></ScrollView>
   </ScrollView>
   <View style={styles.nav}>{['INICIO','CONTACTOS','WHATSAPP','VIDEOS','AJUSTES'].map((n,i)=><TouchableOpacity key={n} onPress={()=>go(i)}><Text style={[styles.navText,{color:fg}]}>{n}</Text></TouchableOpacity>)}</View>
