@@ -17,34 +17,49 @@ concurrency:
 jobs:
   build-debug-apk:
     name: Build Viejitos debug APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20.19.4
           cache: npm
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.14.3
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
+      # GitHub's hosted Android image already includes command-line tools.
+      # android-actions/setup-android@v3 currently requests the retired SDK
+      # package "tools", which makes sdkmanager fail before the build starts.
+      - name: Configure Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ANDROID_HOME:=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            echo "Android sdkmanager not found under $ANDROID_HOME/cmdline-tools" >&2
+            exit 1
+          fi
+          echo "Using $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          "$SDKMANAGER" --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.1.12297006"
 
       - name: Install JavaScript dependencies
         run: npm ci --no-audit --no-fund
@@ -54,7 +69,7 @@ jobs:
 
       - name: Build Android debug APK
         working-directory: android
-        run: gradle --no-daemon --stacktrace assembleDebug
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
