@@ -1,1 +1,14 @@
-{"extends":"@react-native/typescript-config/tsconfig.json","compilerOptions":{"strict":true,"jsx":"react-jsx","noEmit":true},"include":["App.tsx"]}
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "jsx": "react-native",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "App.tsx"
+  ]
+}
