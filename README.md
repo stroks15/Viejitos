@@ -1,4 +1,4 @@
-# Viejitos — launcher accesible Android
+# FerOs abues — launcher accesible Android
 
 Repositorio: https://github.com/stroks15/Viejitos
 
@@ -36,7 +36,7 @@ La función `youtube-feed` es independiente de `gestionar-usuarios`; el desplieg
 
 ## Compilación automática de APK
 
-El workflow `.github/workflows/build-apk.yml` compila una APK Android independiente (release) en GitHub Actions cuando se actualiza `main`, cuando se abre/actualiza un pull request hacia `main`, o manualmente desde Actions. La salida se publica como artefacto `viejitos-standalone-apk` durante 30 días. La compilación usa React Native 0.81.5, Node 20.19.4, JDK 17, Gradle Wrapper 8.14.3 y Android SDK 36. El workflow usa los command-line tools ya instalados en el runner y llama directamente a `sdkmanager`; no usa `android-actions/setup-android@v3`, cuya instalación intentaba instalar el paquete retirado `tools` y detenía el job antes de compilar. El identificador Android es `com.viejitos` y la actividad se registra como lanzador y candidata a pantalla HOME; Android todavía requiere que la persona elija Viejitos como aplicación de inicio.
+El workflow `.github/workflows/build-apk.yml` compila una APK Android independiente (release) en GitHub Actions cuando se actualiza `main`, cuando se abre/actualiza un pull request hacia `main`, o manualmente desde Actions. La salida se publica como artefacto `viejitos-standalone-apk` durante 30 días. La compilación usa React Native 0.81.5, Node 20.19.4, JDK 17, Gradle Wrapper 8.14.3 y Android SDK 36. El workflow usa los command-line tools ya instalados en el runner y llama directamente a `sdkmanager`; no usa `android-actions/setup-android@v3`, cuya instalación intentaba instalar el paquete retirado `tools` y detenía el job antes de compilar. El nombre visible de la aplicación es `FerOs abues`; el identificador técnico `com.viejitos` se conserva para permitir actualizaciones sin cambiar de paquete. La interfaz y la actividad Android están bloqueadas en orientación vertical (portrait), y al abrir la app se solicita a Android establecer FerOs abues como aplicación HOME predeterminada.
 
 La compilación se ejecuta desde el wrapper versionado (`android/gradlew`), para que local y CI utilicen la misma distribución de Gradle. Esta automatización genera una APK release con el bundle JavaScript integrado en `assets/index.android.bundle`, y verifica que el bundle exista y que la APK tenga una firma válida. Para facilitar la instalación de pruebas se firma con la clave debug efímera del runner. No es una APK de publicación firmada para Play Store. Para distribución pública se debe configurar una clave de firma privada mediante GitHub Secrets y un flujo release separado.
 
