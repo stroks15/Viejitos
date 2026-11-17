@@ -35,7 +35,7 @@ const DEFAULT_SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 const EMPTY_CHANNELS=Array.from({length:MAX_CHANNELS},()=> '');
 const COLORS=['#1976D2','#168C82','#7955A5','#D18B16','#C04F36','#D52B2B','#526B8A','#59636F'];
 const APPS=[['LLAMAR','☎'],['MENSAJES','✉'],['CONTACTOS','●'],['WHATSAPP','◉'],['LINTERNA','☼'],['RADIO','♫'],['YOUTUBE','▶'],['CALCULADORA','▦'],['CÁMARA','▣']];
-const say=(s:string)=>{Tts.setDefaultLanguage('es-MX').catch(()=>{});Tts.speak(s);};
+const say=(s:string)=>{Tts.getInitStatus().then(()=>{Tts.setDefaultLanguage('es-MX').catch(()=>{});Tts.speak(s);}).catch(()=>{});};
 
 export default function App(){
  const [page,setPage]=useState(0),[channels,setChannels]=useState(EMPTY_CHANNELS),[feeds,setFeeds]=useState<Record<number,Feed>>({});
@@ -49,7 +49,7 @@ export default function App(){
  const [apps,setApps]=useState<AppInfo[]>([]),[appMap,setAppMap]=useState<Record<string,string>>({}),[pickFor,setPickFor]=useState<string|null>(null),[appSearch,setAppSearch]=useState('');
  const [torchOn,setTorchOn]=useState(false),[notifAccess,setNotifAccess]=useState(false),[notes,setNotes]=useState<WaNote[]>([]),[insets,setInsets]=useState<Insets>({top:0,bottom:0,left:0,right:0});
  const lastTap=useRef(0),askedCall=useRef(false),pageRef=useRef(0);pageRef.current=page;
- const scroll=useRef<ScrollView>(null),width=Dimensions.get('window').width;
+ const scroll=useRef<ScrollView>(null),width=Dimensions.get('window').width-insets.left-insets.right;
  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),1000);return()=>clearInterval(t);},[]);
  useEffect(()=>{AsyncStorage.multiGet(['yt.channels','yt.endpoint','yt.anon','font','contrast','voice','quickLinks','consultName','consultPhone','consultUrl','visibleApps','appMap']).then(rows=>{const v=Object.fromEntries(rows);if(v['yt.channels']){const saved=JSON.parse(v['yt.channels']!);setChannels(Array.from({length:MAX_CHANNELS},(_,i)=>typeof saved[i]==='string'?saved[i]:''));}if(v['yt.endpoint'])setEndpoint(v['yt.endpoint']!);if(v['yt.anon'])setAnon(v['yt.anon']!);if(v.font)setFont(Number(v.font));if(v.contrast)setContrast(v.contrast==='true');if(v.voice)setVoice(v.voice==='true');if(v.quickLinks){const links=JSON.parse(v.quickLinks);setQuickLinks(Array.from({length:QUICK_LINKS},(_,i)=>typeof links[i]==='string'?links[i]:''));}if(v.consultName!==null)setConsultName(v.consultName||'');if(v.consultPhone!==null)setConsultPhone(v.consultPhone||'');if(v.consultUrl!==null)setConsultUrl(v.consultUrl||'');if(v.visibleApps){const saved=JSON.parse(v.visibleApps);setVisibleApps(APPS.map(a=>a[0]).filter(name=>saved.includes(name)));}if(v.appMap){try{setAppMap(JSON.parse(v.appMap));}catch{}}setSettingsLoaded(true);}).catch(()=>setSettingsLoaded(true));},[]);
  useEffect(()=>{if(!settingsLoaded)return;AsyncStorage.multiSet([['yt.channels',JSON.stringify(channels)],['yt.endpoint',endpoint],['yt.anon',anon],['font',String(font)],['contrast',String(contrast)],['voice',String(voice)],['quickLinks',JSON.stringify(quickLinks)],['consultName',consultName],['consultPhone',consultPhone],['consultUrl',consultUrl],['visibleApps',JSON.stringify(visibleApps)],['appMap',JSON.stringify(appMap)]]).catch(()=>{});},[settingsLoaded,channels,endpoint,anon,font,contrast,voice,quickLinks,consultName,consultPhone,consultUrl,visibleApps,appMap]);
@@ -138,7 +138,7 @@ export default function App(){
  return <View style={[styles.root,{backgroundColor:bg,paddingTop:insets.top+4,paddingLeft:insets.left,paddingRight:insets.right}]}>
   <StatusBar hidden={true} translucent={true} backgroundColor="transparent" barStyle={dark?'light-content':'dark-content'}/>
   <View style={styles.top}><Text style={{color:fg,fontWeight:'900'}}>▰ Batería   ◉ Wi-Fi   ▥ Datos   ᛒ Bluetooth</Text><Text style={{color:fg,fontWeight:'900'}}>{page+1}/5</Text></View>
-  <ScrollView ref={scroll} horizontal pagingEnabled scrollEnabled showsHorizontalScrollIndicator={false}>
+  <ScrollView ref={scroll} horizontal pagingEnabled scrollEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={e=>{const p=Math.round(e.nativeEvent.contentOffset.x/width);if(p!==pageRef.current)setPage(Math.max(0,Math.min(4,p)));}}>
    <ScrollView style={{width}} contentContainerStyle={{padding:16}}>
     <View style={styles.clock}><Text style={[styles.time,{color:fg}]}>{time.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true})}</Text><Text style={{color:muted,fontWeight:'900'}}>{time.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).toUpperCase()}</Text></View>
     <TouchableOpacity style={styles.whatsapp} onPress={once(()=>{if(voice)say('WhatsApp');void openWhatsApp();})}><Text style={{fontSize:34,color:'#FFF'}}>◉</Text><Text style={styles.whatsappText}>WHATSAPP</Text></TouchableOpacity>
