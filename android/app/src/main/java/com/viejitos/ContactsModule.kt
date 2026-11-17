@@ -14,50 +14,53 @@ class ContactsModule(private val context: ReactApplicationContext) :
 
   override fun getName(): String = "ContactsModule"
 
+  private class Entry(val id: String, val name: String, val photo: String?) {
+    val phones = ArrayList<String>()
+  }
+
+  /** Una sola consulta a la tabla de teléfonos (antes era una consulta por contacto). */
   @ReactMethod
   fun getContacts(promise: Promise) {
     try {
-      val result: WritableArray = Arguments.createArray()
-      val resolver = context.contentResolver
-      val projection = arrayOf(
-        ContactsContract.Contacts._ID,
-        ContactsContract.Contacts.DISPLAY_NAME,
-        ContactsContract.Contacts.PHOTO_THUMBNAIL_URI
-      )
-      resolver.query(
-        ContactsContract.Contacts.CONTENT_URI,
-        projection,
-        ContactsContract.Contacts.HAS_PHONE_NUMBER + " = 1",
+      val phone = ContactsContract.CommonDataKinds.Phone
+      val entries = LinkedHashMap<String, Entry>()
+      context.contentResolver.query(
+        phone.CONTENT_URI,
+        arrayOf(phone.CONTACT_ID, phone.DISPLAY_NAME, phone.PHOTO_THUMBNAIL_URI, phone.NUMBER, phone.IS_PRIMARY),
         null,
-        ContactsContract.Contacts.DISPLAY_NAME + " COLLATE LOCALIZED ASC"
+        null,
+        phone.DISPLAY_NAME + " COLLATE LOCALIZED ASC"
       )?.use { cursor ->
-        val idIndex = cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID)
-        val nameIndex = cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME)
-        val photoIndex = cursor.getColumnIndexOrThrow(ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
+        val idIndex = cursor.getColumnIndexOrThrow(phone.CONTACT_ID)
+        val nameIndex = cursor.getColumnIndexOrThrow(phone.DISPLAY_NAME)
+        val photoIndex = cursor.getColumnIndexOrThrow(phone.PHOTO_THUMBNAIL_URI)
+        val numberIndex = cursor.getColumnIndexOrThrow(phone.NUMBER)
+        val primaryIndex = cursor.getColumnIndexOrThrow(phone.IS_PRIMARY)
         while (cursor.moveToNext()) {
-          val contactId = cursor.getString(idIndex)
-          val item: WritableMap = Arguments.createMap()
-          item.putString("id", contactId)
-          item.putString("name", cursor.getString(nameIndex) ?: "Sin nombre")
-          if (!cursor.isNull(photoIndex)) item.putString("photoUri", cursor.getString(photoIndex))
-
-          val phones: WritableArray = Arguments.createArray()
-          resolver.query(
-            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-            arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
-            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-            arrayOf(contactId),
-            ContactsContract.CommonDataKinds.Phone.IS_PRIMARY + " DESC"
-          )?.use { phoneCursor ->
-            val numberIndex = phoneCursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
-            while (phoneCursor.moveToNext()) {
-              val number = phoneCursor.getString(numberIndex)?.trim()
-              if (!number.isNullOrEmpty()) phones.pushString(number)
-            }
+          val id = cursor.getString(idIndex) ?: continue
+          val entry = entries.getOrPut(id) {
+            Entry(
+              id,
+              cursor.getString(nameIndex) ?: "Sin nombre",
+              if (cursor.isNull(photoIndex)) null else cursor.getString(photoIndex)
+            )
           }
-          item.putArray("phoneNumbers", phones)
-          result.pushMap(item)
+          val number = cursor.getString(numberIndex)?.trim()
+          if (!number.isNullOrEmpty() && !entry.phones.contains(number)) {
+            if (cursor.getInt(primaryIndex) != 0) entry.phones.add(0, number) else entry.phones.add(number)
+          }
         }
+      }
+      val result: WritableArray = Arguments.createArray()
+      for (entry in entries.values) {
+        val item: WritableMap = Arguments.createMap()
+        item.putString("id", entry.id)
+        item.putString("name", entry.name)
+        if (entry.photo != null) item.putString("photoUri", entry.photo)
+        val phones: WritableArray = Arguments.createArray()
+        for (number in entry.phones) phones.pushString(number)
+        item.putArray("phoneNumbers", phones)
+        result.pushMap(item)
       }
       promise.resolve(result)
     } catch (error: Exception) {

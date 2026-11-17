@@ -72,6 +72,9 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Firma estable opcional (GitHub Secrets). Sin ellas se usa la clave debug del runner.
+def releaseKeystorePath = System.getenv("KEYSTORE_FILE")
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -85,13 +88,23 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    signingConfigs {
+        if (releaseKeystorePath) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         debug {
         }
         release {
             // CI test APKs use the Android debug keystore so they are directly installable.
             // Replace this with a private release keystore before Play Store distribution.
-            signingConfig signingConfigs.debug
+            signingConfig releaseKeystorePath ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
