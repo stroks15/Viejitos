@@ -10,9 +10,9 @@ import com.facebook.react.bridge.WritableMap
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Guarda localmente (SharedPreferences) las últimas notificaciones de WhatsApp. */
+/** Guarda localmente (SharedPreferences) las notificaciones recientes de aplicaciones importantes. */
 object NotificationStore {
-  private const val PREFS = "wa_notifications"
+  private const val PREFS = "device_notifications"
   private const val KEY = "items"
   private const val MAX_ITEMS = 30
 
@@ -46,6 +46,7 @@ object NotificationStore {
     map.putString("key", item.optString("key"))
     map.putString("packageName", item.optString("packageName"))
     map.putString("sender", item.optString("sender"))
+    map.putString("appName", item.optString("appName"))
     map.putString("text", item.optString("text"))
     map.putDouble("time", item.optLong("time").toDouble())
     return map
@@ -64,7 +65,7 @@ object NotificationStore {
 class WhatsAppNotificationService : NotificationListenerService() {
 
   companion object {
-    val WATCHED = setOf("com.whatsapp", "com.whatsapp.w4b")
+    val IGNORED = setOf("android", "com.android.systemui", "com.google.android.googlequicksearchbox")
     // Avisos técnicos de WhatsApp que no son mensajes.
     private val NOISE = Regex(
       "comprobando|verificando|checking for new|\\d+\\s+(mensajes?|messages?)\\s+(de|from)\\s+\\d+\\s+(chats?|conversaciones|conversations)",
@@ -86,7 +87,7 @@ class WhatsAppNotificationService : NotificationListenerService() {
 
   private fun handle(sbn: StatusBarNotification, emit: Boolean) {
     try {
-      if (sbn.packageName !in WATCHED) return
+      if (sbn.packageName in IGNORED || sbn.packageName == packageName) return
       val n = sbn.notification ?: return
       if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
       if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
@@ -100,11 +101,12 @@ class WhatsAppNotificationService : NotificationListenerService() {
       val item = JSONObject()
       item.put("key", sbn.key ?: "${sbn.packageName}:${sbn.id}:${sbn.tag}")
       item.put("packageName", sbn.packageName)
+      item.put("appName", try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString() } catch (_: Exception) { sbn.packageName })
       item.put("sender", title)
       item.put("text", text)
       item.put("time", sbn.postTime)
       NotificationStore.add(applicationContext, item)
-      if (emit) LauncherEvents.emit("WhatsAppNotification", NotificationStore.toMap(item))
+      if (emit) LauncherEvents.emit("DeviceNotification", NotificationStore.toMap(item))
     } catch (_: Exception) {
     }
   }
