@@ -19,6 +19,7 @@ object NotificationStore {
   @Synchronized
   fun all(context: Context): JSONArray {
     val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
+      ?: context.getSharedPreferences("wa_notifications", Context.MODE_PRIVATE).getString(KEY, null)
     return try { if (raw.isNullOrEmpty()) JSONArray() else JSONArray(raw) } catch (_: Exception) { JSONArray() }
   }
 
