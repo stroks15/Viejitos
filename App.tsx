@@ -70,9 +70,19 @@ export default function App(){
   finally{setContactsLoading(false);}
  };
  useEffect(()=>{if(page===1&&contacts.length===0&&!contactsLoading)void loadContacts();},[page]);
- const filteredContacts=contacts.filter(contact=>{const q=contactSearch.trim().toLocaleLowerCase('es-MX');return !q||contact.name.toLocaleLowerCase('es-MX').includes(q)||contact.phoneNumbers.some(phone=>phone.toLowerCase().includes(q));});
+ const filteredContacts=contactSearch.trim()?contacts.filter(contact=>{const q=contactSearch.trim().toLocaleLowerCase('es-MX');return contact.name.toLocaleLowerCase('es-MX').includes(q)||contact.phoneNumbers.some(phone=>phone.toLowerCase().includes(q));}):[];
  const contactPageCount=Math.max(1,Math.ceil(filteredContacts.length/6));
  const visibleContacts=filteredContacts.slice(contactsPage*6,contactsPage*6+6);
+ const contactActions=(contact:PhoneContact)=>{
+  const phone=contact.phoneNumbers[0]||'';
+  if(!phone){Alert.alert(contact.name,'Este contacto no tiene un número telefónico.');return;}
+  Alert.alert('¿Qué deseas hacer?',`Seleccionaste a ${contact.name}. Elige cómo quieres comunicarte.`,[
+   {text:'Llamar',onPress:()=>{void callContact(phone);}},
+   {text:'WhatsApp',onPress:()=>{const digits=phone.replace(/\\D/g,'');const waNumber=digits.length===10?`52${digits}`:digits;Linking.openURL(`https://wa.me/${waNumber}`).catch(()=>Alert.alert('WhatsApp','No se pudo abrir WhatsApp.'));}},
+   {text:'Mensaje SMS',onPress:()=>{const num=phone.replace(/[^+0-9]/g,'');Linking.openURL(`sms:${num}`).catch(()=>Alert.alert('Mensajes','No se pudo abrir la aplicación de mensajes.'));}},
+   {text:'Cancelar',style:'cancel'}
+  ]);
+ };
  const callContact=async(phone:string)=>{
   const num=phone.replace(/[^+0-9]/g,'');if(!num)return;
   try{
@@ -146,12 +156,13 @@ export default function App(){
     <Text style={[styles.section,{color:fg}]}>APLICACIONES</Text><View style={styles.grid}>{APPS.filter(a=>visibleApps.includes(a[0])).map((a,i)=>tile(a[0],a[1],i))}</View>
     <Text style={[styles.section,{color:fg}]}>ENLACES RÁPIDOS</Text>{consultPhone.trim()||consultUrl.trim()?<TouchableOpacity style={[styles.card,{backgroundColor:card}]} onPress={()=>{const target=consultUrl.trim()||`tel:${consultPhone.replace(/[^+0-9]/g,'')}`;Linking.openURL(target).catch(()=>Alert.alert('Servicio de consulta','No se pudo abrir el contacto configurado.'));}}><Text style={{color:fg,fontSize:font,fontWeight:'900'}}>{consultName.trim()||'SERVICIO DE CONSULTA'}  ↗</Text><Text style={{color:muted}}>{consultPhone}</Text></TouchableOpacity>:null}{quickLinks.map((url,i)=>url.trim()?<TouchableOpacity key={i} style={[styles.card,{backgroundColor:card}]} onPress={()=>Linking.openURL(url.trim()).catch(()=>Alert.alert('Enlace','No se pudo abrir este enlace.'))}><Text style={{color:fg,fontSize:font,fontWeight:'800'}}>ENLACE {i+1}  ↗</Text><Text style={{color:muted}} numberOfLines={1}>{url}</Text></TouchableOpacity>:null)}
    </ScrollView>
-   <ScrollView style={{width}} contentContainerStyle={{padding:16}}>{title('CONTACTOS')}<Text style={{color:muted,marginBottom:10}}>Tu agenda del teléfono · nombres, fotos y llamadas</Text>
-    <TextInput value={contactSearch} onChangeText={value=>{setContactSearch(value);setContactsPage(0);}} placeholder="Buscar por nombre o teléfono" style={styles.input}/>
+   <ScrollView style={{width}} contentContainerStyle={{padding:16}}>{title('CONTACTOS')}<Text style={{color:muted,marginBottom:10}}>Busca una persona de tu agenda para elegir cómo comunicarte. No mostraremos la lista completa.</Text>
+    <TextInput value={contactSearch} onChangeText={value=>{setContactSearch(value);setContactsPage(0);}} placeholder="Escribe un nombre o teléfono para buscar" style={styles.input}/>
     {contactsLoading?<ActivityIndicator size="large" color="#1976D2"/>:null}
     {contactsError?<View style={[styles.card,{backgroundColor:card,marginTop:12}]}><Text style={{color:fg,fontWeight:'800'}}>{contactsError}</Text><TouchableOpacity style={styles.refresh} onPress={loadContacts}><Text style={styles.white}>DAR PERMISO / REINTENTAR</Text></TouchableOpacity></View>:null}
-    {!contactsLoading&&contacts.length===0&&!contactsError?<TouchableOpacity style={styles.refresh} onPress={loadContacts}><Text style={styles.white}>CARGAR CONTACTOS</Text></TouchableOpacity>:null}
-    <View style={styles.contactList}>{visibleContacts.map((contact,i)=>{const phone=contact.phoneNumbers[0]||'';return <View key={contact.id} style={[styles.contactCard,{backgroundColor:card}]}><View style={styles.contactAvatar}>{contact.photoUri?<Image source={{uri:contact.photoUri}} style={styles.contactPhoto}/>:<Text style={styles.contactInitial}>{(contact.name.trim()[0]||'?').toLocaleUpperCase('es-MX')}</Text>}</View><View style={{flex:1}}><Text style={[styles.contactName,{color:fg,fontSize:Math.max(18,font-4)}]}>{contact.name}</Text><Text style={{color:muted,fontSize:14}} numberOfLines={1}>{phone||'Sin teléfono'}</Text></View><TouchableOpacity disabled={!phone} style={[styles.callButton,{opacity:phone?1:0.4}]} onPress={once(()=>{void callContact(phone);})}><Text style={styles.white}>LLAMAR</Text></TouchableOpacity></View>;})}</View>
+    {!contactSearch.trim()&&!contactsError?<Text style={{color:muted,marginTop:18,fontSize:font-4}}>🔎 Escribe al menos parte del nombre o número para encontrar un contacto.</Text>:null}
+    {contactSearch.trim()&&contacts.length===0&&!contactsLoading&&!contactsError?<TouchableOpacity style={styles.refresh} onPress={loadContacts}><Text style={styles.white}>BUSCAR EN MIS CONTACTOS</Text></TouchableOpacity>:null}
+    <View style={styles.contactList}>{visibleContacts.map(contact=>{const phone=contact.phoneNumbers[0]||'';return <TouchableOpacity key={contact.id} style={[styles.contactCard,{backgroundColor:card}]} onPress={()=>contactActions(contact)}><View style={styles.contactAvatar}>{contact.photoUri?<Image source={{uri:contact.photoUri}} style={styles.contactPhoto}/>:<Text style={styles.contactInitial}>{(contact.name.trim()[0]||'?').toLocaleUpperCase('es-MX')}</Text>}</View><View style={{flex:1}}><Text style={[styles.contactName,{color:fg,fontSize:Math.max(18,font-4)}]}>{contact.name}</Text><Text style={{color:muted,fontSize:14}} numberOfLines={1}>{phone||'Sin teléfono'}</Text><Text style={{color:'#16834A',fontWeight:'900',marginTop:4}}>TOCA PARA LLAMAR O ENVIAR MENSAJE</Text></View></TouchableOpacity>;})}</View>
     {filteredContacts.length>0?<View style={styles.row}><TouchableOpacity disabled={contactsPage===0} onPress={()=>setContactsPage(p=>Math.max(0,p-1))}><Text style={[styles.adjust,{opacity:contactsPage===0?0.35:1}]}>‹ ANTERIOR</Text></TouchableOpacity><Text style={{color:fg,fontWeight:'900'}}>{contactsPage+1} / {contactPageCount}</Text><TouchableOpacity disabled={contactsPage>=contactPageCount-1} onPress={()=>setContactsPage(p=>Math.min(contactPageCount-1,p+1))}><Text style={[styles.adjust,{opacity:contactsPage>=contactPageCount-1?0.35:1}]}>SIGUIENTE ›</Text></TouchableOpacity></View>:contacts.length>0?<Text style={{color:muted,marginTop:16}}>No hay contactos que coincidan con la búsqueda.</Text>:null}
     <TouchableOpacity style={[styles.refresh,{marginTop:12}]} onPress={loadContacts}><Text style={styles.white}>ACTUALIZAR AGENDA</Text></TouchableOpacity>
    </ScrollView>
