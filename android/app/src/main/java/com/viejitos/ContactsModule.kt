@@ -1,6 +1,6 @@
 package com.viejitos
 
-import android.provider.ContactsContract
+import android.provider.ContactsContract.CommonDataKinds.Phone
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -22,20 +22,26 @@ class ContactsModule(private val context: ReactApplicationContext) :
   @ReactMethod
   fun getContacts(promise: Promise) {
     try {
-      val phone = ContactsContract.CommonDataKinds.Phone
       val entries = LinkedHashMap<String, Entry>()
       context.contentResolver.query(
-        phone.CONTENT_URI,
-        arrayOf(phone.CONTACT_ID, phone.DISPLAY_NAME, phone.PHOTO_THUMBNAIL_URI, phone.NUMBER, phone.IS_PRIMARY),
+        Phone.CONTENT_URI,
+        arrayOf(
+          Phone.CONTACT_ID,
+          Phone.DISPLAY_NAME,
+          Phone.PHOTO_THUMBNAIL_URI,
+          Phone.NUMBER,
+          Phone.IS_PRIMARY
+        ),
         null,
         null,
-        phone.DISPLAY_NAME + " COLLATE LOCALIZED ASC"
+        Phone.DISPLAY_NAME + " COLLATE LOCALIZED ASC"
       )?.use { cursor ->
-        val idIndex = cursor.getColumnIndexOrThrow(phone.CONTACT_ID)
-        val nameIndex = cursor.getColumnIndexOrThrow(phone.DISPLAY_NAME)
-        val photoIndex = cursor.getColumnIndexOrThrow(phone.PHOTO_THUMBNAIL_URI)
-        val numberIndex = cursor.getColumnIndexOrThrow(phone.NUMBER)
-        val primaryIndex = cursor.getColumnIndexOrThrow(phone.IS_PRIMARY)
+        val idIndex = cursor.getColumnIndexOrThrow(Phone.CONTACT_ID)
+        val nameIndex = cursor.getColumnIndexOrThrow(Phone.DISPLAY_NAME)
+        val photoIndex = cursor.getColumnIndexOrThrow(Phone.PHOTO_THUMBNAIL_URI)
+        val numberIndex = cursor.getColumnIndexOrThrow(Phone.NUMBER)
+        val primaryIndex = cursor.getColumnIndexOrThrow(Phone.IS_PRIMARY)
+
         while (cursor.moveToNext()) {
           val id = cursor.getString(idIndex) ?: continue
           val entry = entries.getOrPut(id) {
@@ -47,10 +53,15 @@ class ContactsModule(private val context: ReactApplicationContext) :
           }
           val number = cursor.getString(numberIndex)?.trim()
           if (!number.isNullOrEmpty() && !entry.phones.contains(number)) {
-            if (cursor.getInt(primaryIndex) != 0) entry.phones.add(0, number) else entry.phones.add(number)
+            if (cursor.getInt(primaryIndex) != 0) {
+              entry.phones.add(0, number)
+            } else {
+              entry.phones.add(number)
+            }
           }
         }
       }
+
       val result: WritableArray = Arguments.createArray()
       for (entry in entries.values) {
         val item: WritableMap = Arguments.createMap()
@@ -64,7 +75,11 @@ class ContactsModule(private val context: ReactApplicationContext) :
       }
       promise.resolve(result)
     } catch (error: Exception) {
-      promise.reject("CONTACTS_READ_FAILED", "No se pudieron leer los contactos del teléfono.", error)
+      promise.reject(
+        "CONTACTS_READ_FAILED",
+        "No se pudieron leer los contactos del teléfono.",
+        error
+      )
     }
   }
 }
