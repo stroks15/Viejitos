@@ -159,7 +159,8 @@ export default function App(){
  const whatsappNotes=notes.filter(n=>WHATSAPP_PKGS.includes(n.packageName));
  const moveHomeApp=(name:string,delta:number)=>setHomeOrder(old=>{const list=old.filter(x=>APPS.some(a=>a[0]===x));const i=list.indexOf(name),j=i+delta;if(i<0||j<0||j>=list.length)return list;const next=[...list];[next[i],next[j]]=[next[j],next[i]];return next;});
  const openYouTubeSearch=()=>{const q=channelSearch.trim();if(!q){Alert.alert('Buscar canal','Escribe el nombre del canal que deseas encontrar.');return;}Linking.openURL('https://www.youtube.com/results?search_query='+encodeURIComponent(q)).catch(()=>Alert.alert('YouTube','No se pudo abrir la búsqueda.'));};
- return <View style={[styles.root,{backgroundColor:page===0?'#EAF5F2':page===1?'#EAF2FA':bg,paddingTop:insets.top+4,paddingLeft:insets.left,paddingRight:insets.right}]}>
+ return <View style={[styles.root,{backgroundColor:page===0?'#DCEEFF':page===1?'#DDF8E9':bg,paddingTop:insets.top+4,paddingLeft:insets.left,paddingRight:insets.right}]}>
+  {(page===0?['#FFFFFF','#FCFEFF','#F7FBFF','#F1F8FF','#ECF5FF','#E8F2FF','#E3EFFF','#DCEEFF']:page===1?['#FFFFFF','#FCFFFD','#F6FFFA','#F0FCF5','#EAFBF1','#E5F9EE','#E1F8EB','#DDF8E9']:[]).map((color,index)=><View key={'pastel-gradient-'+index} pointerEvents="none" style={{position:'absolute',left:0,right:0,top:(index*12.5)+'%',height:'13%',backgroundColor:color}}/> )}
   <StatusBar hidden={true} translucent={true} backgroundColor="transparent" barStyle={dark?'light-content':'dark-content'}/>
   <View style={styles.top}><Text style={{color:fg,fontWeight:'900'}}>▰ Batería   ◉ Wi-Fi   ▥ Datos   ᛒ Bluetooth</Text><Text style={{color:fg,fontWeight:'900'}}>{page+1}/6</Text></View>
   <ScrollView ref={scroll} horizontal pagingEnabled scrollEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={e=>{const p=Math.round(e.nativeEvent.contentOffset.x/width);if(p!==pageRef.current)setPage(Math.max(0,Math.min(5,p)));}}>
