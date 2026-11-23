@@ -10,6 +10,8 @@ import android.graphics.drawable.Drawable
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -85,13 +87,26 @@ object LauncherEvents {
 }
 
 class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
+  @Volatile private var speech: TextToSpeech? = null
 
   init {
+    speech = TextToSpeech(ctx) { status -> if (status == TextToSpeech.SUCCESS) speech?.language = Locale("es", "MX") }
     LauncherEvents.reactContext = ctx
     LauncherEvents.ensureTorchTracking(ctx)
   }
 
   override fun getName(): String = "LauncherModule"
+
+  @ReactMethod
+  fun speakSpanish(text: String, promise: Promise) {
+    try {
+      val engine = speech
+      if (engine == null) { promise.resolve(false); return }
+      engine.language = Locale("es", "MX")
+      engine.speak(text.take(240), TextToSpeech.QUEUE_FLUSH, null, "feros-${System.currentTimeMillis()}")
+      promise.resolve(true)
+    } catch (e: Exception) { promise.reject("TTS_FAILED", "No se pudo reproducir la voz.", e) }
+  }
 
   private fun launch(intent: Intent) {
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
