@@ -37,7 +37,7 @@ const DEFAULT_SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 const EMPTY_CHANNELS=Array.from({length:MAX_CHANNELS},()=> '');
 const COLORS=['#1976D2','#168C82','#7955A5','#D18B16','#C04F36','#D52B2B','#526B8A','#59636F'];
 const APPS=[['LLAMAR','☎'],['MENSAJES','✉'],['CONTACTOS','●'],['WHATSAPP','◉'],['LINTERNA','☼'],['RADIO','♫'],['YOUTUBE','▶'],['CALCULADORA','▦'],['CÁMARA','▣']];
-const say=(s:string)=>{if(Platform.OS==='android'&&Launcher?.speakSpanish){Launcher.speakSpanish(s).catch(()=>{});return;}Tts.getInitStatus().then(()=>{Tts.setDefaultLanguage('es-MX').catch(()=>{});Tts.speak(s);}).catch(()=>{});};
+const say=(s:string)=>{const fallback=()=>{Tts.getInitStatus().then(()=>{Tts.setDefaultLanguage('es-MX').catch(()=>{});Tts.speak(s);}).catch(()=>{});};if(Platform.OS==='android'&&Launcher?.speakSpanish){Launcher.speakSpanish(s).then(ok=>{if(!ok)fallback();}).catch(fallback);return;}fallback();};
 
 export default function App(){
  const [page,setPage]=useState(0),[channels,setChannels]=useState(EMPTY_CHANNELS),[feeds,setFeeds]=useState<Record<number,Feed>>({});
@@ -188,7 +188,7 @@ export default function App(){
    <ScrollView style={{width}} contentContainerStyle={{padding:16}}>{title('NOTIFICACIONES')}
     <Text style={{color:muted,marginBottom:12}}>Avisos recientes de WhatsApp, SMS, llamadas perdidas, Messenger y otras aplicaciones.</Text>
     <TouchableOpacity style={[styles.refresh,{backgroundColor:'#245C91'}]} onPress={()=>twoTap('notif-access','Activar acceso a notificaciones',grantNotifAccess)}><Text style={styles.white}>{notifAccess?'ADMINISTRAR PERMISO DE NOTIFICACIONES':'ACTIVAR NOTIFICACIONES'}</Text></TouchableOpacity>
-    {!notifAccess?<View style={[styles.card,{backgroundColor:card}]}><Text style={{color:fg,fontWeight:'800',fontSize:Math.max(16,font-6)}}>Para ver aquí tus mensajes, activa el acceso a notificaciones de FerOs abues.</Text><Text style={{color:muted,marginTop:8}}>Si Android indica “Ajuste restringido”, abre Información de la app, pulsa ⋮ y elige “Permitir ajustes restringidos”.</Text><TouchableOpacity style={[styles.refresh,{marginTop:12}]} onPress={once(grantNotifAccess)}><Text style={styles.white}>ACTIVAR ACCESO A NOTIFICACIONES</Text></TouchableOpacity><TouchableOpacity style={[styles.refresh,{backgroundColor:'#245C91',marginBottom:0}]} onPress={()=>twoTap('app-settings','Abrir información de la aplicación',()=>{Launcher?.openAppSettings().catch(()=>{});})}><Text style={styles.white}>INFORMACIÓN DE LA APP</Text></TouchableOpacity></View>:null}
+    {!notifAccess?<View style={[styles.card,{backgroundColor:card}]}><Text style={{color:fg,fontWeight:'800',fontSize:Math.max(16,font-6)}}>Para ver aquí tus mensajes, activa el acceso a notificaciones de FerOs abues.</Text><Text style={{color:muted,marginTop:8}}>Si Android indica “Ajuste restringido”, abre Información de la app, pulsa ⋮ y elige “Permitir ajustes restringidos”.</Text><TouchableOpacity style={[styles.refresh,{marginTop:12}]} onPress={()=>twoTap('notif-access','Activar acceso a notificaciones',grantNotifAccess)}><Text style={styles.white}>ACTIVAR ACCESO A NOTIFICACIONES</Text></TouchableOpacity><TouchableOpacity style={[styles.refresh,{backgroundColor:'#245C91',marginBottom:0}]} onPress={()=>twoTap('app-settings','Abrir información de la aplicación',()=>{Launcher?.openAppSettings().catch(()=>{});})}><Text style={styles.white}>INFORMACIÓN DE LA APP</Text></TouchableOpacity></View>:null}
     <View style={[styles.card,{backgroundColor:card}]}>{notes.length?notes.map(noteRow):<Text style={{color:fg}}>{notifAccess?'No hay notificaciones recientes.':'Activa el acceso en Android para consultar tus notificaciones.'}</Text>}</View>
     {notes.length?<TouchableOpacity onPress={clearNotes}><Text style={{color:'#C0392B',textAlign:'center',fontWeight:'900',marginVertical:12}}>BORRAR HISTORIAL</Text></TouchableOpacity>:null}
     <Text style={[styles.section,{color:fg}]}>CONVERSACIONES RECIENTES DE WHATSAPP</Text><Text style={{color:muted,marginBottom:8}}>Historial local de los últimos avisos recibidos, aunque ya se hayan leído.</Text>{whatsappNotes.length?whatsappNotes.map(noteRow):<Text style={{color:muted}}>Todavía no hay conversaciones registradas.</Text>}
@@ -281,7 +281,7 @@ export default function App(){
    <ScrollView style={{width}} contentContainerStyle={{padding:16}}>
     {title('WHATSAPP · CONVERSACIONES RECIENTES')}
     <Text style={{color:muted,marginBottom:12}}>Aquí se conservan las conversaciones detectadas en las notificaciones, incluso después de leerlas o descartarlas del panel de Android.</Text>
-    <TouchableOpacity style={[styles.refresh,{backgroundColor:'#16834A'}]} onPress={once(()=>{void openWhatsApp();})}><Text style={styles.white}>ABRIR WHATSAPP</Text></TouchableOpacity>
+    <TouchableOpacity style={[styles.refresh,{backgroundColor:'#16834A'}]} onPress={()=>twoTap('open-whatsapp','Abrir WhatsApp',()=>{void openWhatsApp();})}><Text style={styles.white}>ABRIR WHATSAPP</Text></TouchableOpacity>
     {whatsappNotes.length?whatsappNotes.map(noteRow):<View style={[styles.card,{backgroundColor:card}]}><Text style={{color:fg}}>Todavía no hay conversaciones registradas. Activa el acceso a notificaciones en la pestaña NOTIFICACIONES y WhatsApp irá guardando los avisos de tus chats.</Text></View>}
    </ScrollView>
   </ScrollView>
