@@ -31,6 +31,7 @@ class FerOsInCallService : InCallService() {
       putExtra(CallActivity.EXTRA_NUMBER, call.details.handle?.schemeSpecificPart ?: "")
       putExtra(CallActivity.EXTRA_PHOTO, contact.second)
       putExtra(CallActivity.EXTRA_STATE, call.state)
+      putExtra(CallActivity.EXTRA_UNKNOWN, contact.first.isBlank() || contact.first == (call.details.handle?.schemeSpecificPart ?: ""))
     }
     try { startActivity(intent) } catch (_: Exception) {
       // Algunos fabricantes bloquean el inicio de Activities desde segundo plano.
