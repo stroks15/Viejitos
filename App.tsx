@@ -8,7 +8,7 @@ type Feed={channelTitle:string;videos:Video[]};
 type PhoneContact={id:string;name:string;photoUri?:string;phoneNumbers:string[]};
 type EmergencyAction='call'|'wa-call'|'sms'|'wa-message';
 type EmergencyShortcut={contact:PhoneContact;action:EmergencyAction};
-const ContactsNative=NativeModules.ContactsModule as {getContacts:()=>Promise<PhoneContact[]>} | undefined;
+const ContactsNative=NativeModules.ContactsModule as {getContacts:()=>Promise<PhoneContact[]>;pickContact?:()=>Promise<PhoneContact|null>} | undefined;
 type AppInfo={label:string;packageName:string;icon?:string};
 type WaNote={key:string;packageName:string;appName?:string;sender:string;text:string;time:number};
 type Insets={top:number;bottom:number;left:number;right:number};
@@ -101,6 +101,19 @@ export default function App(){
  const once=(fn:()=>void)=>()=>{const now=Date.now();if(now-lastTap.current<DEBOUNCE_MS)return;lastTap.current=now;fn();};
  const openEmergencyAction=(slot:EmergencyShortcut)=>{const raw=slot.contact.phoneNumbers[0]||'';const phone=raw.replace(/[^+0-9]/g,'');if(!phone){Alert.alert(slot.contact.name,'Este contacto no tiene un número telefónico.');return;}const digits=phone.replace(/\D/g,'');const waNumber=digits.length===10?'52'+digits:digits;if(slot.action==='call'){void callContact(phone);return;}if(slot.action==='sms'){Linking.openURL('smsto:'+phone).catch(()=>Alert.alert('Mensajes','No se pudo abrir la aplicación de mensajes.'));return;}if(slot.action==='wa-message'){Linking.openURL('https://wa.me/'+waNumber).catch(()=>Alert.alert('WhatsApp','No se pudo abrir el chat.'));return;}Alert.alert('Llamada por WhatsApp','Se abrirá el chat de '+slot.contact.name+'. Para iniciar la llamada, toca el icono de teléfono dentro de WhatsApp.',[{text:'ABRIR CHAT',onPress:()=>Linking.openURL('https://wa.me/'+waNumber).catch(()=>{})},{text:'CANCELAR',style:'cancel'}]);};
  const selectEmergencyContact=(contact:PhoneContact)=>{setPendingContact(contact);setContactChooser(false);setActionChooser(true);};
+ const pickSystemContact=async(index:number)=>{
+  setContactSlotIndex(index);
+  try{
+   if(!ContactsNative?.pickContact)throw new Error('El selector nativo no está disponible.');
+   const contact=await ContactsNative.pickContact();
+   if(!contact)return;
+   if(!contact.phoneNumbers?.length){Alert.alert(contact.name,'Este contacto no tiene un número telefónico. Elige otro contacto.');return;}
+   setPendingContact(contact);
+   setActionChooser(true);
+  }catch(error){
+   Alert.alert('Agenda del teléfono','No se pudo abrir el selector de Android. Puedes elegir el contacto desde la lista de respaldo.',[{text:'CANCELAR',style:'cancel'},{text:'VER CONTACTOS',onPress:()=>{if(contacts.length===0)void loadContacts();setContactChooser(true);}}]);
+  }
+ };
  const saveEmergencyAction=(action:EmergencyAction)=>{if(contactSlotIndex===null||!pendingContact)return;setEmergencySlots(old=>old.map((slot,i)=>i===contactSlotIndex?{contact:pendingContact,action}:slot));setPendingContact(null);setContactSlotIndex(null);setActionChooser(false);};
  const actionLabel=(action:EmergencyAction)=>({call:'llamada telefónica','wa-call':'llamada por WhatsApp',sms:'mensaje SMS','wa-message':'mensaje por WhatsApp'}[action]);
  const twoTap=(key:string,label:string,fn:()=>void)=>{if(selectedItem!==key){setSelectedItem(key);if(voice)say(label);return;}setSelectedItem(null);fn();};
@@ -179,7 +192,7 @@ export default function App(){
     <ScrollView style={{height:Math.max(300,Dimensions.get('window').height-290)}} nestedScrollEnabled pagingEnabled showsVerticalScrollIndicator={false} onMomentumScrollEnd={e=>{const pageIndex=Math.max(0,Math.min(4,Math.round(e.nativeEvent.contentOffset.y/Math.max(300,Dimensions.get('window').height-290))));setContactsPage(pageIndex);setSelectedItem(null);}}>
      {Array.from({length:5},(_,p)=><View key={p} style={{height:Math.max(300,Dimensions.get('window').height-290),justifyContent:'center',paddingVertical:8}}>
       <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:10}}>
-       {emergencySlots.slice(p*4,p*4+4).map((slot,local)=>{const index=p*4+local;const key='emergency:'+index;const active=selectedItem===key;return <TouchableOpacity key={index} accessibilityRole="button" accessibilityLabel={slot?slot.contact.name+' '+actionLabel(slot.action):'Agregar contacto de emergencia'} style={{width:'48%',height:Math.max(126,(Dimensions.get('window').height-360)/2),borderRadius:22,borderWidth:active?6:3,borderColor:active?'#FFD600':'#245C91',backgroundColor:slot?'rgba(224,250,242,0.97)':'rgba(255,255,255,0.96)',alignItems:'center',justifyContent:'center',padding:10,elevation:active?8:2,transform:[{scale:active?1.025:1}]}} onPress={()=>{if(!slot){twoTap(key,'Agregar contacto de emergencia',()=>{setContactSlotIndex(index);if(contacts.length===0)void loadContacts();setContactChooser(true);});return;}twoTap(key,slot.contact.name+', '+actionLabel(slot.action),()=>openEmergencyAction(slot));}}>
+       {emergencySlots.slice(p*4,p*4+4).map((slot,local)=>{const index=p*4+local;const key='emergency:'+index;const active=selectedItem===key;return <TouchableOpacity key={index} accessibilityRole="button" accessibilityLabel={slot?slot.contact.name+' '+actionLabel(slot.action):'Agregar contacto de emergencia'} style={{width:'48%',height:Math.max(126,(Dimensions.get('window').height-360)/2),borderRadius:22,borderWidth:active?6:3,borderColor:active?'#FFD600':'#245C91',backgroundColor:slot?'rgba(224,250,242,0.97)':'rgba(255,255,255,0.96)',alignItems:'center',justifyContent:'center',padding:10,elevation:active?8:2,transform:[{scale:active?1.025:1}]}} onPress={()=>{if(!slot){twoTap(key,'Agregar contacto de emergencia',()=>{void pickSystemContact(index);});return;}twoTap(key,slot.contact.name+', '+actionLabel(slot.action),()=>openEmergencyAction(slot));}}>
         {slot?.contact.photoUri?<Image source={{uri:slot.contact.photoUri}} style={{width:76,height:76,borderRadius:38,marginBottom:6}}/>:null}
         <Text style={{fontSize:slot?Math.max(20,font-2):68,fontWeight:'900',color:slot?'#123B48':'#16834A',textAlign:'center'}} numberOfLines={2}>{slot?slot.contact.name:'＋'}</Text>
         {slot?<><Text style={{fontSize:16,fontWeight:'900',color:'#145B54',marginTop:5}}>{({call:'☎ LLAMAR','wa-call':'🟢 WHATSAPP','sms':'✉ SMS','wa-message':'💬 WHATSAPP'})[slot.action]}</Text><TouchableOpacity onPress={()=>twoTap('emergency-edit:'+index,'Editar '+slot.contact.name,()=>Alert.alert('Editar '+slot.contact.name,'Elige una opción.',[{text:'Cambiar acción',onPress:()=>{setContactSlotIndex(index);setPendingContact(slot.contact);setActionChooser(true);}},{text:'Cambiar contacto',onPress:()=>{setContactSlotIndex(index);setContactChooser(true);}},{text:'Eliminar',style:'destructive',onPress:()=>setEmergencySlots(old=>old.map((v,i)=>i===index?null:v))},{text:'Cancelar',style:'cancel'}]))}><Text style={{color:'#9B1C1C',fontWeight:'900',fontSize:15,marginTop:7}}>EDITAR / QUITAR</Text></TouchableOpacity></>:<Text style={{fontSize:17,fontWeight:'900',color:'#145B54'}}>AGREGAR CONTACTO</Text>}
