@@ -4,14 +4,18 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.app.role.RoleManager
+import android.telecom.TelecomManager
+import android.media.AudioManager
+import android.os.BatteryManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import android.speech.tts.TextToSpeech
-import java.util.Locale
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -87,34 +91,25 @@ object LauncherEvents {
 }
 
 class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
-  @Volatile private var speech: TextToSpeech? = null
-  @Volatile private var speechReady: Boolean = false
-
   init {
-    speech = TextToSpeech(ctx) { status ->
-      speechReady = status == TextToSpeech.SUCCESS && speech?.let { it.language = Locale("es", "MX"); it.isLanguageAvailable(Locale("es", "MX")) >= TextToSpeech.LANG_AVAILABLE } == true
-    }
     LauncherEvents.reactContext = ctx
     LauncherEvents.ensureTorchTracking(ctx)
+    SpeechController.initialize(ctx)
   }
 
   override fun getName(): String = "LauncherModule"
 
   override fun onCatalystInstanceDestroy() {
-    try { speech?.stop(); speech?.shutdown() } catch (_: Exception) {}
-    speech = null
-    speechReady = false
     super.onCatalystInstanceDestroy()
   }
 
   @ReactMethod
   fun speakSpanish(text: String, promise: Promise) {
     try {
-      val engine = speech
-      if (engine == null || !speechReady) { promise.resolve(false); return }
-      val result = engine.speak(text.take(240), TextToSpeech.QUEUE_FLUSH, null, "feros-${System.currentTimeMillis()}")
-      promise.resolve(result == TextToSpeech.SUCCESS)
-    } catch (e: Exception) { promise.reject("TTS_FAILED", "No se pudo reproducir la voz.", e) }
+      promise.resolve(SpeechController.speak(text))
+    } catch (e: Exception) {
+      promise.reject("TTS_FAILED", "No se pudo reproducir la voz.", e)
+    }
   }
 
   private fun launch(intent: Intent) {
@@ -226,6 +221,95 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
       }
     } catch (e: Exception) {
       promise.reject("CALL_FAILED", "No se pudo abrir el teléfono.", e)
+    }
+  }
+
+  // ─────────────────────────── Volumen accesible ─────────────────────────────
+
+  @ReactMethod
+  fun getMusicVolume(promise: Promise) {
+    try {
+      val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+      val current = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+      val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+      val map = Arguments.createMap()
+      map.putInt("current", current)
+      map.putInt("max", max)
+      map.putBoolean("low", current <= (max * 0.25f))
+      promise.resolve(map)
+    } catch (e: Exception) {
+      promise.reject("VOLUME_READ_FAILED", "No se pudo consultar el volumen.", e)
+    }
+  }
+
+  @ReactMethod
+  fun setMusicVolumeMax(promise: Promise) {
+    try {
+      val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+      audio.setStreamVolume(AudioManager.STREAM_MUSIC, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0)
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("VOLUME_SET_FAILED", "No se pudo subir el volumen multimedia.", e)
+    }
+  }
+
+  // ─────────────────────────── Teléfono predeterminado ───────────────────────────
+
+  @ReactMethod
+  fun isDefaultDialer(promise: Promise) {
+    try {
+      val isDefault = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        val manager = ctx.getSystemService(RoleManager::class.java)
+        manager?.isRoleHeld(RoleManager.ROLE_DIALER) == true
+      } else {
+        val telecom = ctx.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+        telecom.defaultDialerPackage == ctx.packageName
+      }
+      promise.resolve(isDefault)
+    } catch (_: Exception) {
+      promise.resolve(false)
+    }
+  }
+
+  @ReactMethod
+  fun requestDefaultDialerRole(promise: Promise) {
+    try {
+      val activity = ctx.currentActivity
+      if (activity == null) {
+        promise.reject("NO_ACTIVITY", "Abre FerOs abues para solicitar el teléfono predeterminado.")
+        return
+      }
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        val manager = ctx.getSystemService(RoleManager::class.java)
+        if (manager == null || !manager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+          promise.resolve(false)
+          return
+        }
+        if (manager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+          promise.resolve(true)
+          return
+        }
+        activity.startActivityForResult(manager.createRequestRoleIntent(RoleManager.ROLE_DIALER), 4102)
+      } else {
+        val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
+          putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, ctx.packageName)
+        }
+        activity.startActivity(intent)
+      }
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("DIALER_ROLE_FAILED", "No se pudo abrir la solicitud de teléfono predeterminado.", e)
+    }
+  }
+
+  @ReactMethod
+  fun setCallVoiceEnabled(enabled: Boolean, promise: Promise) {
+    try {
+      ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE)
+        .edit().putBoolean("call_voice_enabled", enabled).apply()
+      promise.resolve(true)
+    } catch (_: Exception) {
+      promise.resolve(false)
     }
   }
 
