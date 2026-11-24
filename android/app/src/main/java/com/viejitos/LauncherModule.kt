@@ -7,6 +7,9 @@ import android.content.pm.PackageManager
 import android.app.role.RoleManager
 import android.telecom.TelecomManager
 import android.media.AudioManager
+import android.os.BatteryManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
