@@ -19,7 +19,7 @@ class ContactsModule(private val context: ReactApplicationContext) :
   private var pickerPromise: Promise? = null
   private val pickerRequestCode = 7412
   private val activityListener: ActivityEventListener = object : BaseActivityEventListener() {
-    override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
+    override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
       if (requestCode != pickerRequestCode) return
       val promise = pickerPromise ?: return
       pickerPromise = null
@@ -61,7 +61,7 @@ class ContactsModule(private val context: ReactApplicationContext) :
       promise.reject("CONTACT_PICK_BUSY", "Ya hay un selector de contactos abierto.")
       return
     }
-    val activity = currentActivity
+    val activity = getCurrentActivity()
     if (activity == null) {
       promise.reject("NO_ACTIVITY", "No hay una pantalla disponible para abrir la agenda.")
       return
