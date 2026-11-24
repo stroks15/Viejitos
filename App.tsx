@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Alert, AppState, BackHandler, DeviceEventEmitter, Dimensions, Image, Linking, Modal, PermissionsAndroid, NativeModules, Platform, ScrollView, Share, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, Alert, AppState, BackHandler, DeviceEventEmitter, Dimensions, Image, Linking, Modal, PermissionsAndroid, NativeModules, Platform, ScrollView, Share, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, Vibration, View} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Tts from 'react-native-tts';
 import HoldToOpenSettings from './src/components/HoldToOpenSettings';
@@ -130,7 +130,7 @@ export default function App(){
  };
  const saveEmergencyAction=(action:EmergencyAction)=>{if(contactSlotIndex===null||!pendingContact)return;setEmergencySlots(old=>old.map((slot,i)=>i===contactSlotIndex?{contact:pendingContact,action}:slot));setPendingContact(null);setContactSlotIndex(null);setActionChooser(false);};
  const actionLabel=(action:EmergencyAction)=>({call:'llamada telefónica','wa-call':'llamada por WhatsApp',sms:'mensaje SMS','wa-message':'mensaje por WhatsApp'}[action]);
- const twoTap=(key:string,label:string,fn:()=>void)=>{const now=Date.now();if(now-lastTap.current<DEBOUNCE_MS)return;lastTap.current=now;lastTapKey.current=key;if(singleTap){setSelectedItem(null);if(voice)say(label);fn();return;}if(selectedItem!==key){setSelectedItem(key);if(voice)say(label);return;}setSelectedItem(null);fn();};
+ const twoTap=(key:string,label:string,fn:()=>void)=>{const now=Date.now();if(now-lastTap.current<DEBOUNCE_MS)return;lastTap.current=now;lastTapKey.current=key;Vibration.vibrate(12);if(singleTap){setSelectedItem(null);if(voice)say(label);fn();return;}if(selectedItem!==key){setSelectedItem(key);if(voice)say(label);return;}setSelectedItem(null);fn();};
  const refreshInsets=()=>{if(Platform.OS!=='android')return;if(Launcher)Launcher.getInsets().then(setInsets).catch(()=>{});else setInsets(o=>({...o,top:StatusBar.currentHeight||0}));};
  const refreshNative=async()=>{
   refreshInsets();
@@ -141,6 +141,9 @@ export default function App(){
   try{setNotes(await Launcher.getStoredNotifications());}catch{}
   try{setApps(await Launcher.getInstalledApps());}catch{}
    try{setSmsMessages(await Launcher.getStoredSmsMessages?.()||[]);}catch{}
+   try{setSmsPermission(await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS));}catch{}
+   try{setCallLogPermission(await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_CALL_LOG));}catch{}
+   try{setMissedCalls(await Launcher.getMissedCalls?.()||[]);}catch{}
    try{setCallLogPermission(await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_CALL_LOG));}catch{}
    try{setMissedCalls(await Launcher.getMissedCalls?.()||[]);}catch{}
   try{const status=await Launcher.getDeviceStatus?.();if(status)setDeviceStatus(status);}catch{}
@@ -327,7 +330,7 @@ export default function App(){
     </View>
     <View style={[styles.card,{backgroundColor:card}]}>
      <Text style={[styles.channelTitle,{color:fg,fontSize:font-2}]}>Tamaño de letra</Text>
-     <View style={styles.row}><TouchableOpacity onPress={()=>twoTap('font-down','Reducir tamaño de letra',()=>setFont(Math.max(18,font-2)))}><Text style={styles.adjust}>A−</Text></TouchableOpacity><Text style={{color:fg,fontSize:font}}>{font}</Text><TouchableOpacity onPress={()=>twoTap('font-up','Aumentar tamaño de letra',()=>setFont(Math.min(36,font+2)))}><Text style={styles.adjust}>A+</Text></TouchableOpacity></View>
+     <View style={styles.row}><TouchableOpacity onPress={()=>twoTap('font-down','Reducir tamaño de letra',()=>setFont(Math.max(24,font-2)))}><Text style={styles.adjust}>A−</Text></TouchableOpacity><Text style={{color:fg,fontSize:font}}>{font}</Text><TouchableOpacity onPress={()=>twoTap('font-up','Aumentar tamaño de letra',()=>setFont(Math.min(48,font+2)))}><Text style={styles.adjust}>A+</Text></TouchableOpacity></View>
     </View>
     <View style={[styles.card,{backgroundColor:card}]}>
      <Text style={[styles.channelTitle,{color:fg,fontSize:font-2}]}>Personalizar Inicio</Text>
