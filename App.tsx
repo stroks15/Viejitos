@@ -17,7 +17,7 @@ const Launcher=NativeModules.LauncherModule as {
  callNumber:(n:string)=>Promise<string>;isFlashAvailable:()=>Promise<boolean>;isTorchOn:()=>Promise<boolean>;setTorch:(on:boolean)=>Promise<boolean>;
  isNotificationAccessGranted:()=>Promise<boolean>;openNotificationAccessSettings:()=>Promise<boolean>;openAppSettings:()=>Promise<boolean>;
  getStoredNotifications:()=>Promise<WaNote[]>;clearStoredNotifications:()=>Promise<boolean>;getInsets:()=>Promise<Insets>;speakSpanish?:(text:string)=>Promise<boolean>;
- isDefaultDialer?:()=>Promise<boolean>;requestDefaultDialerRole?:()=>Promise<boolean>;setCallVoiceEnabled?:(enabled:boolean)=>Promise<boolean>;getMusicVolume?:()=>Promise<{current:number;max:number;low:boolean}>;setMusicVolumeMax?:()=>Promise<boolean>;
+ isDefaultDialer?:()=>Promise<boolean>;requestDefaultDialerRole?:()=>Promise<boolean>;setCallVoiceEnabled?:(enabled:boolean)=>Promise<boolean>;getMusicVolume?:()=>Promise<{current:number;max:number;low:boolean}>;setMusicVolumeMax?:()=>Promise<boolean>;getDeviceStatus?:()=>Promise<{battery:number;wifi:boolean;mobile:boolean}>;
 } | undefined;
 const DEBOUNCE_MS=400;
 const WHATSAPP_PKGS=['com.whatsapp','com.whatsapp.w4b'];
@@ -58,6 +58,7 @@ export default function App(){
  const [selectedItem,setSelectedItem]=useState<string|null>(null);
  const [dialerRole,setDialerRole]=useState(false),[metroEditing,setMetroEditing]=useState(false),[metroSelected,setMetroSelected]=useState<string|null>(null);
  const [singleTap,setSingleTap]=useState(false),[volumeLow,setVolumeLow]=useState(false);
+ const [deviceStatus,setDeviceStatus]=useState({battery:0,wifi:false,mobile:false});
  const [tileSizes,setTileSizes]=useState<Record<string,'small'|'medium'|'wide'>>({}),[importJson,setImportJson]=useState(''),[importVisible,setImportVisible]=useState(false);
  const scroll=useRef<ScrollView>(null),contactsScroll=useRef<ScrollView>(null),width=Dimensions.get('window').width-insets.left-insets.right;
  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),1000);return()=>clearInterval(t);},[]);
@@ -131,6 +132,7 @@ export default function App(){
   try{setNotifAccess(await Launcher.isNotificationAccessGranted());}catch{}
   try{setNotes(await Launcher.getStoredNotifications());}catch{}
   try{setApps(await Launcher.getInstalledApps());}catch{}
+  try{const status=await Launcher.getDeviceStatus?.();if(status)setDeviceStatus(status);}catch{}
  };
  const refreshRef=useRef(refreshNative);refreshRef.current=refreshNative;
  useEffect(()=>{
@@ -195,7 +197,11 @@ export default function App(){
  return <View style={[styles.root,{backgroundColor:page===0?'#DCEEFF':page===1?'#DDF8E9':bg,paddingTop:insets.top+4,paddingLeft:insets.left,paddingRight:insets.right}]}>
   {(page===0?['#FFFFFF','#FCFEFF','#F7FBFF','#F1F8FF','#ECF5FF','#E8F2FF','#E3EFFF','#DCEEFF']:page===1?['#FFFFFF','#FCFFFD','#F6FFFA','#F0FCF5','#EAFBF1','#E5F9EE','#E1F8EB','#DDF8E9']:[]).map((color,index)=><View key={'pastel-gradient-'+index} pointerEvents="none" style={{position:'absolute',left:0,right:0,top:Dimensions.get('window').height*index/8,height:Dimensions.get('window').height*0.14,backgroundColor:color}}/> )}
   <StatusBar hidden={true} translucent={true} backgroundColor="transparent" barStyle={dark?'light-content':'dark-content'}/>
-  <View style={styles.top}><Text style={{color:fg,fontWeight:'900'}}>▰ Batería   ◉ Wi-Fi   ▥ Datos   ᛒ Bluetooth</Text><Text style={{color:fg,fontWeight:'900'}}>{page+1}/6</Text></View>
+  <View style={styles.top}>
+   <Text style={{color:fg,fontWeight:'900',fontSize:14,flex:1}}>🔋 {deviceStatus.battery}%   {deviceStatus.wifi?'Wi-Fi conectado':'Wi-Fi apagado'}   {deviceStatus.mobile?'Red móvil':'Sin red móvil'}</Text>
+   <TouchableOpacity delayLongPress={2000} onPress={()=>{}} onLongPress={()=>go(4)} accessibilityRole="button" accessibilityLabel="Mantén pulsado dos segundos para abrir Ajustes"><Text style={{color:fg,fontWeight:'900',fontSize:17}}>⚙ AJUSTES</Text></TouchableOpacity>
+   <Text style={{color:fg,fontWeight:'900',marginLeft:8}}>{page+1}/6</Text>
+  </View>
   <ScrollView ref={scroll} horizontal pagingEnabled scrollEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={e=>{const p=Math.round(e.nativeEvent.contentOffset.x/width);if(p!==pageRef.current)setPage(Math.max(0,Math.min(5,p)));}}>
    <ScrollView style={{width}} contentContainerStyle={{padding:16}}>
     <View style={styles.clock}><Text style={[styles.time,{color:fg}]}>{time.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true})}</Text><Text style={{color:muted,fontWeight:'900'}}>{time.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).toUpperCase()}</Text></View>
