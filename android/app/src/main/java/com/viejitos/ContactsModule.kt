@@ -53,6 +53,15 @@ class ContactsModule(private val context: ReactApplicationContext) :
 
   init { context.addActivityEventListener(activityListener) }
 
+  override fun invalidate() {
+    context.removeActivityEventListener(activityListener)
+    pickerPromise?.let { pending ->
+      pickerPromise = null
+      pending.reject("CONTACT_PICK_CANCELLED", "El selector de contactos se cerró antes de terminar.")
+    }
+    super.invalidate()
+  }
+
   override fun getName(): String = "ContactsModule"
 
   @ReactMethod
