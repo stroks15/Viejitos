@@ -48,6 +48,10 @@
             <category android:name="android.intent.category.HOME" />
             <category android:name="android.intent.category.DEFAULT" />
         </intent-filter>
+        <intent-filter>
+          <action android:name="android.intent.action.DIAL" />
+          <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
         <!-- Habilita la elegibilidad de ROLE_DIALER: ACTION_DIAL y ACTION_VIEW para tel:. -->
         <intent-filter>
           <action android:name="android.intent.action.DIAL" />
