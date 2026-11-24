@@ -25,6 +25,7 @@ class CallActivity : Activity() {
     const val EXTRA_NUMBER = "phone_number"
     const val EXTRA_PHOTO = "photo_uri"
     const val EXTRA_STATE = "call_state"
+    const val EXTRA_UNKNOWN = "unknown_caller"
     @Volatile var current: CallActivity? = null
   }
 
@@ -32,6 +33,7 @@ class CallActivity : Activity() {
   private lateinit var nameView: TextView
   private lateinit var avatar: ImageView
   private lateinit var actions: LinearLayout
+  private lateinit var fraudWarning: TextView
   private var speakerEnabled = false
   private var microphoneMuted = false
   private var tts: TextToSpeech? = null
@@ -104,6 +106,20 @@ class CallActivity : Activity() {
       typeface = Typeface.create("sans-serif", Typeface.BOLD)
       gravity = Gravity.CENTER
       maxLines = 3
+    }
+    fraudWarning = TextView(this).apply {
+      text = "⚠ Desconocido: No digas códigos ni des datos del banco"
+      setTextColor(Color.WHITE)
+      textSize = 18f
+      typeface = Typeface.DEFAULT_BOLD
+      gravity = Gravity.CENTER
+      setPadding(dp(12), dp(12), dp(12), dp(12))
+      background = GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(Color.rgb(190, 25, 35)) }
+      visibility = if (intent.getBooleanExtra(EXTRA_UNKNOWN, false)) android.view.View.VISIBLE else android.view.View.GONE
+    }
+    if (fraudWarning.visibility == android.view.View.VISIBLE) {
+      val blink = android.view.animation.AlphaAnimation(0.45f, 1f).apply { duration = 650; repeatMode = android.view.animation.Animation.REVERSE; repeatCount = android.view.animation.Animation.INFINITE }
+      fraudWarning.startAnimation(blink)
     }
     actions = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
