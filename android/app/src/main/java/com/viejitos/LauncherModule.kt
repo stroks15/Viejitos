@@ -10,6 +10,8 @@ import android.graphics.drawable.Drawable
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -85,13 +87,35 @@ object LauncherEvents {
 }
 
 class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
+  @Volatile private var speech: TextToSpeech? = null
+  @Volatile private var speechReady: Boolean = false
 
   init {
+    speech = TextToSpeech(ctx) { status ->
+      speechReady = status == TextToSpeech.SUCCESS && speech?.let { it.language = Locale("es", "MX"); it.isLanguageAvailable(Locale("es", "MX")) >= TextToSpeech.LANG_AVAILABLE } == true
+    }
     LauncherEvents.reactContext = ctx
     LauncherEvents.ensureTorchTracking(ctx)
   }
 
   override fun getName(): String = "LauncherModule"
+
+  override fun onCatalystInstanceDestroy() {
+    try { speech?.stop(); speech?.shutdown() } catch (_: Exception) {}
+    speech = null
+    speechReady = false
+    super.onCatalystInstanceDestroy()
+  }
+
+  @ReactMethod
+  fun speakSpanish(text: String, promise: Promise) {
+    try {
+      val engine = speech
+      if (engine == null || !speechReady) { promise.resolve(false); return }
+      val result = engine.speak(text.take(240), TextToSpeech.QUEUE_FLUSH, null, "feros-${System.currentTimeMillis()}")
+      promise.resolve(result == TextToSpeech.SUCCESS)
+    } catch (e: Exception) { promise.reject("TTS_FAILED", "No se pudo reproducir la voz.", e) }
+  }
 
   private fun launch(intent: Intent) {
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

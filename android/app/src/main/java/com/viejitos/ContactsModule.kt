@@ -1,6 +1,10 @@
 package com.viejitos
 
 import android.provider.ContactsContract.CommonDataKinds.Phone
+import android.app.Activity
+import android.content.Intent
+import com.facebook.react.bridge.ActivityEventListener
+import com.facebook.react.bridge.BaseActivityEventListener
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -12,7 +16,73 @@ import com.facebook.react.bridge.WritableMap
 class ContactsModule(private val context: ReactApplicationContext) :
   ReactContextBaseJavaModule(context) {
 
+  private var pickerPromise: Promise? = null
+  private val pickerRequestCode = 7412
+  private val activityListener: ActivityEventListener = object : BaseActivityEventListener() {
+    override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+      if (requestCode != pickerRequestCode) return
+      val promise = pickerPromise ?: return
+      pickerPromise = null
+      if (resultCode != Activity.RESULT_OK || data?.data == null) {
+        promise.resolve(null)
+        return
+      }
+      try {
+        val uri = data.data!!
+        context.contentResolver.query(uri, arrayOf(Phone.CONTACT_ID, Phone.DISPLAY_NAME, Phone.PHOTO_THUMBNAIL_URI, Phone.NUMBER), null, null, null)?.use { cursor ->
+          if (!cursor.moveToFirst()) {
+            promise.resolve(null)
+            return
+          }
+          val item = Arguments.createMap()
+          item.putString("id", cursor.getString(cursor.getColumnIndexOrThrow(Phone.CONTACT_ID)))
+          item.putString("name", cursor.getString(cursor.getColumnIndexOrThrow(Phone.DISPLAY_NAME)) ?: "Contacto")
+          val photoIndex = cursor.getColumnIndex(Phone.PHOTO_THUMBNAIL_URI)
+          if (photoIndex >= 0 && !cursor.isNull(photoIndex)) item.putString("photoUri", cursor.getString(photoIndex))
+          val number = cursor.getString(cursor.getColumnIndexOrThrow(Phone.NUMBER))
+          val numbers = Arguments.createArray()
+          if (!number.isNullOrBlank()) numbers.pushString(number)
+          item.putArray("phoneNumbers", numbers)
+          promise.resolve(item)
+        } ?: promise.resolve(null)
+      } catch (error: Exception) {
+        promise.reject("CONTACT_PICK_FAILED", "No se pudo leer el contacto seleccionado.", error)
+      }
+    }
+  }
+
+  init { context.addActivityEventListener(activityListener) }
+
+  override fun invalidate() {
+    context.removeActivityEventListener(activityListener)
+    pickerPromise?.let { pending ->
+      pickerPromise = null
+      pending.reject("CONTACT_PICK_CANCELLED", "El selector de contactos se cerró antes de terminar.")
+    }
+    super.invalidate()
+  }
+
   override fun getName(): String = "ContactsModule"
+
+  @ReactMethod
+  fun pickContact(promise: Promise) {
+    if (pickerPromise != null) {
+      promise.reject("CONTACT_PICK_BUSY", "Ya hay un selector de contactos abierto.")
+      return
+    }
+    val activity = getCurrentActivity()
+    if (activity == null) {
+      promise.reject("NO_ACTIVITY", "No hay una pantalla disponible para abrir la agenda.")
+      return
+    }
+    try {
+      pickerPromise = promise
+      activity.startActivityForResult(Intent(Intent.ACTION_PICK, Phone.CONTENT_URI), pickerRequestCode)
+    } catch (error: Exception) {
+      pickerPromise = null
+      promise.reject("CONTACT_PICK_FAILED", "No se pudo abrir la agenda del teléfono.", error)
+    }
+  }
 
   private class Entry(val id: String, val name: String, val photo: String?) {
     val phones = ArrayList<String>()
