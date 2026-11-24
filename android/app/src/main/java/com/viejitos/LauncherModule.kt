@@ -23,6 +23,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.CallLog
 import android.provider.Settings
 import android.util.Base64
 import androidx.core.app.NotificationManagerCompat
@@ -264,6 +265,47 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
       handler.postDelayed(run, 600)
       if (!SpeechController.speak(label) { handler.removeCallbacks(run); run.run() }) run.run()
     } catch (e: Exception) { promise.reject("APP_OPEN_FAILED", "No se pudo abrir la aplicación.", e) }
+  }
+
+
+  @ReactMethod
+  fun getMissedCalls(promise: Promise) {
+    if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+      promise.resolve(Arguments.createArray())
+      return
+    }
+    try {
+      val grouped = linkedMapOf<String, MutableMap<String, Any>>()
+      val projection = arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NAME, CallLog.Calls.DATE)
+      ctx.contentResolver.query(CallLog.Calls.CONTENT_URI, projection,
+        "${CallLog.Calls.TYPE} = ?", arrayOf(CallLog.Calls.MISSED_TYPE.toString()),
+        "${CallLog.Calls.DATE} DESC")?.use { cursor ->
+        val numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER)
+        val nameIndex = cursor.getColumnIndex(CallLog.Calls.CACHED_NAME)
+        val dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE)
+        while (cursor.moveToNext()) {
+          val number = if (numberIndex >= 0) cursor.getString(numberIndex).orEmpty() else ""
+          if (number.isBlank()) continue
+          val name = if (nameIndex >= 0) cursor.getString(nameIndex).orEmpty().ifBlank { number } else number
+          val date = if (dateIndex >= 0) cursor.getLong(dateIndex) else 0L
+          val item = grouped[number]
+          if (item == null) grouped[number] = mutableMapOf("number" to number, "name" to name, "count" to 1, "timestamp" to date)
+          else item["count"] = (item["count"] as Int) + 1
+          if (grouped.size >= 20) break
+        }
+      }
+      val result = Arguments.createArray()
+      grouped.values.forEach { item ->
+        val map = Arguments.createMap()
+        map.putString("number", item["number"] as String)
+        map.putString("name", item["name"] as String)
+        map.putInt("count", item["count"] as Int)
+        map.putDouble("timestamp", (item["timestamp"] as Long).toDouble())
+        result.pushMap(map)
+      }
+      promise.resolve(result)
+    } catch (e: SecurityException) { promise.resolve(Arguments.createArray()) }
+      catch (e: Exception) { promise.reject("MISSED_CALLS_FAILED", "No se pudieron consultar las llamadas perdidas.", e) }
   }
 
   @ReactMethod
