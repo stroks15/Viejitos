@@ -248,7 +248,7 @@ export default function App(){
      <Text style={{color:muted,marginVertical:8,fontSize:font-5}}>Estos datos solo conectan la pantalla 4 con la función de Supabase. La clave secreta YOUTUBE_API_KEY permanece en Supabase y nunca se introduce en el teléfono.</Text>
      <TextInput value={endpoint} onChangeText={setEndpoint} placeholder="URL de Supabase Edge Function" autoCapitalize="none" style={styles.input}/>
      <TextInput value={anon} onChangeText={setAnon} placeholder="Clave pública anon / publishable" autoCapitalize="none" style={styles.input}/>
-     <TouchableOpacity style={styles.refresh} onPress={refresh}><Text style={styles.white}>PROBAR CONEXIÓN</Text></TouchableOpacity>
+     <TouchableOpacity style={styles.refresh} onPress={()=>twoTap('test-youtube-connection','Probar conexión de YouTube',refresh)}><Text style={styles.white}>PROBAR CONEXIÓN</Text></TouchableOpacity>
     </View>
     <View style={[styles.card,{backgroundColor:card}]}>
      <Text style={[styles.channelTitle,{color:fg,fontSize:font-2}]}>Cuatro enlaces editables</Text>
