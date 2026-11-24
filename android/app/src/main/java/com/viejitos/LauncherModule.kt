@@ -8,6 +8,9 @@ import android.app.role.RoleManager
 import android.telecom.TelecomManager
 import android.media.AudioManager
 import android.os.BatteryManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.Build
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.graphics.Bitmap
@@ -222,6 +225,64 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
     } catch (e: Exception) {
       promise.reject("CALL_FAILED", "No se pudo abrir el teléfono.", e)
     }
+  }
+
+
+  /** Abre el panel oficial de Android; Wi-Fi/Bluetooth/avión no se fuerzan desde apps normales en Android moderno. */
+  @ReactMethod
+  fun openSystemPanel(panel: String, promise: Promise) {
+    try {
+      val action = when (panel) {
+        "wifi" -> if (Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_WIFI else Settings.ACTION_WIFI_SETTINGS
+        "internet" -> if (Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_WIRELESS_SETTINGS
+        "bluetooth" -> Settings.ACTION_BLUETOOTH_SETTINGS
+        "airplane" -> Settings.ACTION_AIRPLANE_MODE_SETTINGS
+        "brightness" -> Settings.ACTION_DISPLAY_SETTINGS
+        "volume" -> Settings.ACTION_SOUND_SETTINGS
+        else -> Settings.ACTION_SETTINGS
+      }
+      launch(Intent(action))
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("PANEL_FAILED", "No se pudo abrir el control de Android.", e)
+    }
+  }
+
+  @ReactMethod
+  fun speakAndOpenApp(label: String, packageName: String, promise: Promise) {
+    try {
+      val intent = ctx.packageManager.getLaunchIntentForPackage(packageName)
+      if (intent == null) { promise.resolve(false); return }
+      val launched = java.util.concurrent.atomic.AtomicBoolean(false)
+      val run = Runnable {
+        if (launched.compareAndSet(false, true)) {
+          try { intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); ctx.startActivity(intent); promise.resolve(true) }
+          catch (e: Exception) { promise.reject("APP_OPEN_FAILED", "No se pudo abrir la aplicación.", e) }
+        }
+      }
+      val handler = Handler(Looper.getMainLooper())
+      handler.postDelayed(run, 600)
+      if (!SpeechController.speak(label) { handler.removeCallbacks(run); run.run() }) run.run()
+    } catch (e: Exception) { promise.reject("APP_OPEN_FAILED", "No se pudo abrir la aplicación.", e) }
+  }
+
+  @ReactMethod
+  fun getStoredSmsMessages(promise: Promise) {
+    try {
+      val raw = ctx.getSharedPreferences("feros_sms", Context.MODE_PRIVATE).getString("messages", "[]") ?: "[]"
+      val parsed = org.json.JSONArray(raw)
+      val result = Arguments.createArray()
+      for (i in 0 until parsed.length()) {
+        val item = parsed.optJSONObject(i) ?: continue
+        val map = Arguments.createMap()
+        map.putString("id", item.optString("id"))
+        map.putString("sender", item.optString("sender"))
+        map.putString("text", item.optString("text"))
+        map.putDouble("timestamp", item.optLong("timestamp").toDouble())
+        result.pushMap(map)
+      }
+      promise.resolve(result)
+    } catch (e: Exception) { promise.reject("SMS_READ_FAILED", "No se pudieron leer los SMS guardados.", e) }
   }
 
   // ─────────────────────────── Volumen accesible ─────────────────────────────
