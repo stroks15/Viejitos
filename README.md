@@ -7,14 +7,14 @@ Launcher vertical (HOME) para adultos mayores: letra grande, alto contraste y bo
 ## Pantallas
 
 1. **Inicio:** reloj y fecha, botón de WhatsApp, últimas notificaciones, accesos grandes a aplicaciones reales (con icono) y enlaces rápidos.
-2. **Contactos:** agenda real del teléfono (nombre, foto y número) con búsqueda y llamada directa con un toque (si no hay permiso de llamada, abre el marcador).
+2. **Contactos de emergencia:** 20 espacios persistentes, cuatro por página en cinco páginas verticales; selector nativo de Android, nombre/foto cuando está disponible y acción configurable para llamada telefónica, WhatsApp, SMS o mensaje WhatsApp. La agenda de respaldo permite elegir un contacto si el selector del fabricante no funciona.
 3. **WhatsApp:** abrir WhatsApp y ver en vivo las notificaciones de `com.whatsapp` / `com.whatsapp.w4b` (requiere activar el acceso a notificaciones).
 4. **Videos:** tres espacios **＋** para canales de YouTube (tres videos recientes por canal) mediante la función `youtube-feed` de Supabase.
 5. **Configuración:** conexión de YouTube, enlaces rápidos, servicio de consulta, aplicaciones visibles, **aplicación asignada a cada botón**, tamaño de letra, voz y alto contraste.
 
 ## Módulos nativos (`android/app/src/main/java/com/viejitos/`)
 
-- `ContactsModule` / `ContactsPackage`: lectura de agenda.
+- `ContactsModule` / `ContactsPackage`: lectura de agenda y selector nativo Android (`ACTION_PICK`) con devolución asíncrona del contacto seleccionado.
 - `LauncherModule` / `LauncherPackage`: apps instaladas (+ iconos Base64), abrir apps y categorías, llamada directa (`ACTION_CALL` con fallback `ACTION_DIAL`), linterna (`CameraManager.setTorchMode`), acceso a notificaciones, márgenes seguros.
 - `WhatsAppNotificationService`: `NotificationListenerService` que guarda las últimas 30 notificaciones y las envía a JS (`WhatsAppNotification`).
 - Ambos paquetes están registrados en `MainApplication.kt`.
@@ -51,6 +51,12 @@ base64 -w0 feros.keystore
 
 No subas `feros.keystore` al repositorio. Esta clave no es de publicación para Play Store.
 
-## Pendiente
+## Límites y pruebas en dispositivo
 
-Radio FM propia, `ROLE_DIALER` como app de teléfono y la agenda de 24 posiciones fijas no están implementadas.
+- La llamada de WhatsApp abre el chat; por restricciones de WhatsApp, el usuario debe tocar el botón de llamada dentro de la aplicación.
+- Los accesos directos y las preferencias se guardan localmente con AsyncStorage; los contactos de emergencia no se envían a un servidor.
+- El selector de contactos depende de una app de agenda compatible con `ACTION_PICK`; si no responde, puede usarse la lista de respaldo (requiere permiso de contactos).
+- La lectura de notificaciones requiere activar manualmente el acceso especial de Android. Android puede ocultar contenido sensible según la configuración de cada app.
+- La APK de CI usa firma debug si no se configuran los secretos de firma; para actualizar sobre una instalación previa se necesita conservar la misma clave privada.
+
+Funciones aún no implementadas: radio FM propia y `ROLE_DIALER` como aplicación de teléfono predeterminada.
