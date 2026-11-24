@@ -19,7 +19,7 @@ class ContactsModule(private val context: ReactApplicationContext) :
   private var pickerPromise: Promise? = null
   private val pickerRequestCode = 7412
   private val activityListener: ActivityEventListener = object : BaseActivityEventListener() {
-    override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+    override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
       if (requestCode != pickerRequestCode) return
       val promise = pickerPromise ?: return
       pickerPromise = null
