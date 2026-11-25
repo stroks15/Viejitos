@@ -99,14 +99,28 @@ object LauncherEvents {
 
 class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
   private var speechPromise: Promise? = null
+  private var photoPromise: Promise? = null
   init {
     ctx.addActivityEventListener(object : ActivityEventListener {
       override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode != 4311) return
-        val promise = speechPromise ?: return
-        speechPromise = null
-        if (resultCode == Activity.RESULT_OK) promise.resolve(data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "")
-        else promise.resolve("")
+        if (requestCode == 4311) {
+          val promise = speechPromise ?: return
+          speechPromise = null
+          if (resultCode == Activity.RESULT_OK) promise.resolve(data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "") else promise.resolve("")
+          return
+        }
+        if (requestCode == 4312) {
+          val promise = photoPromise ?: return
+          photoPromise = null
+          if (resultCode == Activity.RESULT_OK) {
+            try {
+              val bitmap = data?.extras?.get("data") as? Bitmap
+              val uri = if (bitmap != null) MediaStore.Images.Media.insertImage(ctx.contentResolver, bitmap, "FerOs-medicina-" + System.currentTimeMillis(), "Foto de medicina") else null
+              promise.resolve(uri ?: "")
+            } catch (e: Exception) { promise.reject("PHOTO_SAVE_FAILED", "No se pudo guardar la fotografía.", e) }
+          } else promise.resolve("")
+          return
+        }
       }
       override fun onNewIntent(intent: Intent) {}
     })
@@ -134,6 +148,18 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
       speechPromise = promise
       activity.startActivityForResult(intent, 4311)
     } catch (e: Exception) { speechPromise = null; promise.reject("SPEECH_UNAVAILABLE", "El dictado por voz no está disponible.", e) }
+  }
+
+  @ReactMethod
+  fun captureMedicinePhoto(promise: Promise) {
+    try {
+      if (photoPromise != null) { promise.reject("PHOTO_BUSY", "Ya hay una fotografía en proceso."); return }
+      val activity = ctx.currentActivity ?: run { promise.reject("NO_ACTIVITY", "Abre FerOs para tomar la fotografía."); return }
+      val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+      if (intent.resolveActivity(ctx.packageManager) == null) { promise.resolve(""); return }
+      photoPromise = promise
+      activity.startActivityForResult(intent, 4312)
+    } catch (e: Exception) { photoPromise = null; promise.reject("PHOTO_CAPTURE_FAILED", "No se pudo abrir la cámara.", e) }
   }
 
   @ReactMethod
