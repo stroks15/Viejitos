@@ -1,6 +1,7 @@
 package com.viejitos
 
 import android.content.Intent
+import android.media.AudioManager
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
@@ -9,12 +10,37 @@ import android.telecom.VideoProfile
 
 /** Servicio de llamadas del sistema; Android lo enlaza al asignar ROLE_DIALER. */
 class FerOsInCallService : InCallService() {
+  private var previousRingVolume: Int? = null
+
+  private fun applyRingtoneProtection() {
+    val enabled = getSharedPreferences("feros_settings", MODE_PRIVATE)
+      .getBoolean("ringtone_protection", false)
+    if (!enabled || previousRingVolume != null) return
+    try {
+      val audio = getSystemService(AUDIO_SERVICE) as AudioManager
+      previousRingVolume = audio.getStreamVolume(AudioManager.STREAM_RING)
+      audio.setStreamVolume(AudioManager.STREAM_RING,
+        audio.getStreamMaxVolume(AudioManager.STREAM_RING), 0)
+    } catch (_: Exception) { previousRingVolume = null }
+  }
+
+  private fun restoreRingtoneVolume() {
+    val previous = previousRingVolume ?: return
+    try {
+      val audio = getSystemService(AUDIO_SERVICE) as AudioManager
+      audio.setStreamVolume(AudioManager.STREAM_RING, previous, 0)
+    } catch (_: Exception) {
+    } finally { previousRingVolume = null }
+  }
+
   override fun onCallAdded(call: Call) {
     super.onCallAdded(call)
     CallManager.attach(this, call)
     call.registerCallback(object : Call.Callback() {
       override fun onStateChanged(changedCall: Call, state: Int) {
         CallManager.updateState(state)
+        if (state == Call.STATE_RINGING) applyRingtoneProtection()
+        if (state == Call.STATE_DISCONNECTED || state == Call.STATE_DISCONNECTING) restoreRingtoneVolume()
         CallActivity.current?.renderCallState(state)
         if (state == Call.STATE_DISCONNECTED || state == Call.STATE_DISCONNECTING) {
           CallActivity.current?.finishAfterDisconnect()
@@ -39,6 +65,7 @@ class FerOsInCallService : InCallService() {
   }
 
   override fun onCallRemoved(call: Call) {
+    restoreRingtoneVolume()
     super.onCallRemoved(call)
     CallManager.detach(call)
     CallActivity.current?.finishAfterDisconnect()
