@@ -77,6 +77,11 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
     fun schedule(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String = "[]"): Boolean {
       val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
       if (Build.VERSION.SDK_INT >= 31 && !alarm.canScheduleExactAlarms()) return false
+      val clock = java.util.Calendar.getInstance().apply { timeInMillis = at }
+      val prefs = context.getSharedPreferences("feros_medicine", Context.MODE_PRIVATE)
+      val times = try { org.json.JSONObject(prefs.getString("times", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+      times.put(id, org.json.JSONObject().put("hour", clock.get(java.util.Calendar.HOUR_OF_DAY)).put("minute", clock.get(java.util.Calendar.MINUTE)))
+      prefs.edit().putString("times", times.toString()).apply()
       val intent = Intent(context, MedicineAlarmReceiver::class.java).apply {
         putExtra("reminder_id", id); putExtra("medicine_name", name)
         putExtra("medicine_dose", dose); putExtra("medicine_photo", photo)
