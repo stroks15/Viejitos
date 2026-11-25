@@ -3,11 +3,17 @@ package com.viejitos
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.speech.RecognizerIntent
+import android.app.Activity
+import com.facebook.react.bridge.ActivityEventListener
 import android.content.pm.PackageManager
 import android.app.role.RoleManager
 import android.telecom.TelecomManager
 import android.media.AudioManager
 import android.os.BatteryManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.Build
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.graphics.Bitmap
@@ -20,6 +26,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.CallLog
 import android.provider.Settings
 import android.util.Base64
 import androidx.core.app.NotificationManagerCompat
@@ -91,7 +98,32 @@ object LauncherEvents {
 }
 
 class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
+  private var speechPromise: Promise? = null
+  private var photoPromise: Promise? = null
   init {
+    ctx.addActivityEventListener(object : ActivityEventListener {
+      override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == 4311) {
+          val promise = speechPromise ?: return
+          speechPromise = null
+          if (resultCode == Activity.RESULT_OK) promise.resolve(data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "") else promise.resolve("")
+          return
+        }
+        if (requestCode == 4312) {
+          val promise = photoPromise ?: return
+          photoPromise = null
+          if (resultCode == Activity.RESULT_OK) {
+            try {
+              val bitmap = data?.extras?.get("data") as? Bitmap
+              val uri = if (bitmap != null) MediaStore.Images.Media.insertImage(ctx.contentResolver, bitmap, "FerOs-medicina-" + System.currentTimeMillis(), "Foto de medicina") else null
+              promise.resolve(uri ?: "")
+            } catch (e: Exception) { promise.reject("PHOTO_SAVE_FAILED", "No se pudo guardar la fotografía.", e) }
+          } else promise.resolve("")
+          return
+        }
+      }
+      override fun onNewIntent(intent: Intent) {}
+    })
     LauncherEvents.reactContext = ctx
     LauncherEvents.ensureTorchTracking(ctx)
     SpeechController.initialize(ctx)
@@ -101,6 +133,62 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
 
   override fun onCatalystInstanceDestroy() {
     super.onCatalystInstanceDestroy()
+  }
+
+  @ReactMethod
+  fun startSpeechRecognition(promise: Promise) {
+    try {
+      if (speechPromise != null) { promise.reject("SPEECH_BUSY", "Ya hay un dictado en curso."); return }
+      val activity = ctx.currentActivity ?: run { promise.reject("NO_ACTIVITY", "Abre FerOs para usar el dictado."); return }
+      val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+        putExtra(RecognizerIntent.EXTRA_PROMPT, "Di el nombre del producto")
+      }
+      speechPromise = promise
+      activity.startActivityForResult(intent, 4311)
+    } catch (e: Exception) { speechPromise = null; promise.reject("SPEECH_UNAVAILABLE", "El dictado por voz no está disponible.", e) }
+  }
+
+  @ReactMethod
+  fun captureMedicinePhoto(promise: Promise) {
+    try {
+      if (photoPromise != null) { promise.reject("PHOTO_BUSY", "Ya hay una fotografía en proceso."); return }
+      val activity = ctx.currentActivity ?: run { promise.reject("NO_ACTIVITY", "Abre FerOs para tomar la fotografía."); return }
+      val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+      if (intent.resolveActivity(ctx.packageManager) == null) { promise.resolve(""); return }
+      photoPromise = promise
+      activity.startActivityForResult(intent, 4312)
+    } catch (e: Exception) { photoPromise = null; promise.reject("PHOTO_CAPTURE_FAILED", "No se pudo abrir la cámara.", e) }
+  }
+
+  @ReactMethod
+  fun saveContactRelationship(number: String, relationship: String, promise: Promise) {
+    try {
+      val key = number.filter { it.isDigit() }
+      val prefs = ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE)
+      val json = try { org.json.JSONObject(prefs.getString("contact_relationships", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+      if (key.isNotBlank()) { if (relationship.isBlank()) json.remove(key) else json.put(key, relationship) }
+      prefs.edit().putString("contact_relationships", json.toString()).apply()
+      promise.resolve(true)
+    } catch (e: Exception) { promise.reject("RELATIONSHIP_SAVE", "No se pudo guardar el parentesco.", e) }
+  }
+
+  @ReactMethod
+  fun setAutoSpeakerEnabled(enabled: Boolean, promise: Promise) {
+    try { ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE).edit().putBoolean("auto_speaker", enabled).apply(); promise.resolve(true) }
+    catch (e: Exception) { promise.reject("AUTO_SPEAKER", "No se pudo guardar el altavoz automático.", e) }
+  }
+
+  @ReactMethod
+  fun setRingtoneProtection(enabled: Boolean, promise: Promise) {
+    try {
+      ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE)
+        .edit().putBoolean("ringtone_protection", enabled).apply()
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("RINGTONE_SETTING_FAILED", "No se pudo guardar el protector de timbre.", e)
+    }
   }
 
   @ReactMethod
@@ -222,6 +310,195 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
     } catch (e: Exception) {
       promise.reject("CALL_FAILED", "No se pudo abrir el teléfono.", e)
     }
+  }
+
+
+  /** Abre el panel oficial de Android; Wi-Fi/Bluetooth/avión no se fuerzan desde apps normales en Android moderno. */
+  @ReactMethod
+  fun openSystemPanel(panel: String, promise: Promise) {
+    try {
+      val action = when (panel) {
+        "wifi" -> if (Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_WIFI else Settings.ACTION_WIFI_SETTINGS
+        "internet" -> if (Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_WIRELESS_SETTINGS
+        "bluetooth" -> Settings.ACTION_BLUETOOTH_SETTINGS
+        "airplane" -> Settings.ACTION_AIRPLANE_MODE_SETTINGS
+        "brightness" -> Settings.ACTION_DISPLAY_SETTINGS
+        "volume" -> Settings.ACTION_SOUND_SETTINGS
+        else -> Settings.ACTION_SETTINGS
+      }
+      launch(Intent(action))
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("PANEL_FAILED", "No se pudo abrir el control de Android.", e)
+    }
+  }
+
+  @ReactMethod
+  fun speakAndOpenApp(label: String, packageName: String, promise: Promise) {
+    try {
+      val intent = ctx.packageManager.getLaunchIntentForPackage(packageName)
+      if (intent == null) { promise.resolve(false); return }
+      val launched = java.util.concurrent.atomic.AtomicBoolean(false)
+      val run = Runnable {
+        if (launched.compareAndSet(false, true)) {
+          try { intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); ctx.startActivity(intent); promise.resolve(true) }
+          catch (e: Exception) { promise.reject("APP_OPEN_FAILED", "No se pudo abrir la aplicación.", e) }
+        }
+      }
+      val handler = Handler(Looper.getMainLooper())
+      handler.postDelayed(run, 600)
+      if (!SpeechController.speak(label) { handler.removeCallbacks(run); run.run() }) run.run()
+    } catch (e: Exception) { promise.reject("APP_OPEN_FAILED", "No se pudo abrir la aplicación.", e) }
+  }
+
+
+  @ReactMethod
+  fun getMissedCalls(promise: Promise) {
+    if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+      promise.resolve(Arguments.createArray())
+      return
+    }
+    try {
+      val grouped = linkedMapOf<String, MutableMap<String, Any>>()
+      val projection = arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NAME, CallLog.Calls.DATE)
+      ctx.contentResolver.query(CallLog.Calls.CONTENT_URI, projection,
+        "${CallLog.Calls.TYPE} = ?", arrayOf(CallLog.Calls.MISSED_TYPE.toString()),
+        "${CallLog.Calls.DATE} DESC")?.use { cursor ->
+        val numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER)
+        val nameIndex = cursor.getColumnIndex(CallLog.Calls.CACHED_NAME)
+        val dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE)
+        while (cursor.moveToNext()) {
+          val number = if (numberIndex >= 0) cursor.getString(numberIndex).orEmpty() else ""
+          if (number.isBlank()) continue
+          val name = if (nameIndex >= 0) cursor.getString(nameIndex).orEmpty().ifBlank { number } else number
+          val date = if (dateIndex >= 0) cursor.getLong(dateIndex) else 0L
+          val item = grouped[number]
+          if (item == null) grouped[number] = mutableMapOf("number" to number, "name" to name, "count" to 1, "timestamp" to date)
+          else item["count"] = (item["count"] as Int) + 1
+          if (grouped.size >= 20) break
+        }
+      }
+      val result = Arguments.createArray()
+      grouped.values.forEach { item ->
+        val map = Arguments.createMap()
+        map.putString("number", item["number"] as String)
+        map.putString("name", item["name"] as String)
+        map.putInt("count", item["count"] as Int)
+        map.putDouble("timestamp", (item["timestamp"] as Long).toDouble())
+        result.pushMap(map)
+      }
+      promise.resolve(result)
+    } catch (e: SecurityException) { promise.resolve(Arguments.createArray()) }
+      catch (e: Exception) { promise.reject("MISSED_CALLS_FAILED", "No se pudieron consultar las llamadas perdidas.", e) }
+  }
+
+  @ReactMethod
+  fun requestExactAlarmPermission(promise: Promise) {
+    try {
+      if (Build.VERSION.SDK_INT < 31) { promise.resolve(true); return }
+      val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+      if (alarm.canScheduleExactAlarms()) { promise.resolve(true); return }
+      val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      ctx.startActivity(intent); promise.resolve(false)
+    } catch (e: Exception) { promise.reject("EXACT_ALARM_PERMISSION", "No se pudo abrir el permiso de alarmas exactas.", e) }
+  }
+
+  @ReactMethod
+  fun requestFullScreenAlarmPermission(promise: Promise) {
+    try {
+      if (Build.VERSION.SDK_INT < 34) { promise.resolve(true); return }
+      val manager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+      if (manager.canUseFullScreenIntent()) { promise.resolve(true); return }
+      val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      ctx.startActivity(intent); promise.resolve(false)
+    } catch (e: Exception) { promise.reject("FULL_SCREEN_PERMISSION", "No se pudo abrir el permiso de pantalla completa.", e) }
+  }
+
+  @ReactMethod
+  fun scheduleMedicineAlarm(id: String, name: String, dose: String, at: Double, photo: String?, daysJson: String, kind: String, promise: Promise) {
+    try { promise.resolve(MedicineAlarmReceiver.schedule(ctx, id, name, dose, at.toLong(), photo, daysJson, kind)) }
+    catch (e: Exception) { promise.reject("MEDICINE_ALARM_FAILED", "No se pudo programar la alarma.", e) }
+  }
+
+  @ReactMethod
+  fun cancelMedicineAlarm(id: String, promise: Promise) {
+    try { MedicineAlarmReceiver.cancel(ctx, id); promise.resolve(true) }
+    catch (e: Exception) { promise.reject("MEDICINE_CANCEL_FAILED", "No se pudo cancelar el recordatorio.", e) }
+  }
+
+  @ReactMethod
+  fun getMedicineHistory(promise: Promise) {
+    try {
+      val raw = ctx.getSharedPreferences("feros_medicine", Context.MODE_PRIVATE).getString("history", "[]") ?: "[]"
+      val arr = org.json.JSONArray(raw); val result = Arguments.createArray()
+      for (i in 0 until arr.length()) {
+        val item = arr.optJSONObject(i) ?: continue
+        val map = Arguments.createMap()
+        map.putString("id", item.optString("id")); map.putString("reminderId", item.optString("reminderId"))
+        map.putString("name", item.optString("name")); map.putString("dose", item.optString("dose"))
+        map.putDouble("at", item.optLong("at").toDouble()); result.pushMap(map)
+      }
+      promise.resolve(result)
+    } catch (e: Exception) { promise.resolve(Arguments.createArray()) }
+  }
+
+  @ReactMethod
+  fun shareImageToWhatsApp(uriString: String, promise: Promise) {
+    try {
+      val uri = Uri.parse(uriString)
+      val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/*"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        setPackage("com.whatsapp")
+      }
+      if (intent.resolveActivity(ctx.packageManager) == null) { promise.resolve(false); return }
+      launch(intent); promise.resolve(true)
+    } catch (e: Exception) { promise.reject("WHATSAPP_SHARE_FAILED", "No se pudo compartir la fotografía por WhatsApp.", e) }
+  }
+
+  @ReactMethod
+  fun getGalleryImages(limit: Int, promise: Promise) {
+    val permission = if (Build.VERSION.SDK_INT >= 33) "android.permission.READ_MEDIA_IMAGES" else Manifest.permission.READ_EXTERNAL_STORAGE
+    if (ContextCompat.checkSelfPermission(ctx, permission) != PackageManager.PERMISSION_GRANTED) {
+      promise.reject("GALLERY_PERMISSION", "Falta permiso para leer fotografías.")
+      return
+    }
+    try {
+      val result = Arguments.createArray()
+      val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME)
+      ctx.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null,
+        MediaStore.Images.Media.DATE_ADDED + " DESC")?.use { cursor ->
+        val idIndex=cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        val nameIndex=cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+        var count=0
+        while(cursor.moveToNext() && count < limit.coerceIn(1,300)) {
+          val imageId=cursor.getLong(idIndex)
+          val uri=Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, imageId.toString())
+          val map=Arguments.createMap(); map.putString("id", imageId.toString()); map.putString("uri",uri.toString())
+          map.putString("name",cursor.getString(nameIndex) ?: "Fotografía"); result.pushMap(map); count++
+        }
+      }
+      promise.resolve(result)
+    } catch (e: SecurityException) { promise.reject("GALLERY_PERMISSION", "Android no permitió leer las fotografías.", e) }
+      catch (e: Exception) { promise.reject("GALLERY_READ_FAILED", "No se pudo leer la galería.", e) }
+  }
+
+  @ReactMethod
+  fun getStoredSmsMessages(promise: Promise) {
+    try {
+      val raw = ctx.getSharedPreferences("feros_sms", Context.MODE_PRIVATE).getString("messages", "[]") ?: "[]"
+      val parsed = org.json.JSONArray(raw)
+      val result = Arguments.createArray()
+      for (i in 0 until parsed.length()) {
+        val item = parsed.optJSONObject(i) ?: continue
+        val map = Arguments.createMap()
+        map.putString("id", item.optString("id"))
+        map.putString("sender", item.optString("sender"))
+        map.putString("text", item.optString("text"))
+        map.putDouble("timestamp", item.optLong("timestamp").toDouble())
+        result.pushMap(map)
+      }
+      promise.resolve(result)
+    } catch (e: Exception) { promise.reject("SMS_READ_FAILED", "No se pudieron leer los SMS guardados.", e) }
   }
 
   // ─────────────────────────── Volumen accesible ─────────────────────────────
