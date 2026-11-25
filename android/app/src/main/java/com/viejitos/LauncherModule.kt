@@ -320,6 +320,66 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
   }
 
   @ReactMethod
+  fun requestExactAlarmPermission(promise: Promise) {
+    try {
+      if (Build.VERSION.SDK_INT < 31) { promise.resolve(true); return }
+      val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+      if (alarm.canScheduleExactAlarms()) { promise.resolve(true); return }
+      val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      ctx.startActivity(intent); promise.resolve(false)
+    } catch (e: Exception) { promise.reject("EXACT_ALARM_PERMISSION", "No se pudo abrir el permiso de alarmas exactas.", e) }
+  }
+
+  @ReactMethod
+  fun scheduleMedicineAlarm(id: String, name: String, dose: String, at: Double, photo: String?, promise: Promise) {
+    try { promise.resolve(MedicineAlarmReceiver.schedule(ctx, id, name, dose, at.toLong(), photo)) }
+    catch (e: Exception) { promise.reject("MEDICINE_ALARM_FAILED", "No se pudo programar la alarma.", e) }
+  }
+
+  @ReactMethod
+  fun getMedicineHistory(promise: Promise) {
+    try {
+      val raw = ctx.getSharedPreferences("feros_medicine", Context.MODE_PRIVATE).getString("history", "[]") ?: "[]"
+      val arr = org.json.JSONArray(raw); val result = Arguments.createArray()
+      for (i in 0 until arr.length()) {
+        val item = arr.optJSONObject(i) ?: continue
+        val map = Arguments.createMap()
+        map.putString("id", item.optString("id")); map.putString("reminderId", item.optString("reminderId"))
+        map.putString("name", item.optString("name")); map.putString("dose", item.optString("dose"))
+        map.putDouble("at", item.optLong("at").toDouble()); result.pushMap(map)
+      }
+      promise.resolve(result)
+    } catch (e: Exception) { promise.resolve(Arguments.createArray()) }
+  }
+
+  @ReactMethod
+  fun getGalleryImages(limit: Int, promise: Promise) {
+    val permission = if (Build.VERSION.SDK_INT >= 33) "android.permission.READ_MEDIA_IMAGES" else Manifest.permission.READ_EXTERNAL_STORAGE
+    if (ContextCompat.checkSelfPermission(ctx, permission) != PackageManager.PERMISSION_GRANTED) {
+      promise.reject("GALLERY_PERMISSION", "Falta permiso para leer fotografías.")
+      return
+    }
+    try {
+      val result = Arguments.createArray()
+      val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME)
+      ctx.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null,
+        MediaStore.Images.Media.DATE_ADDED + " DESC")?.use { cursor ->
+        val idIndex=cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        val nameIndex=cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+        var count=0
+        while(cursor.moveToNext() && count < limit.coerceIn(1,300)) {
+          val imageId=cursor.getLong(idIndex)
+          val uri=Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, imageId.toString())
+          val map=Arguments.createMap(); map.putString("id", imageId.toString()); map.putString("uri",uri.toString())
+          map.putString("name",cursor.getString(nameIndex) ?: "Fotografía"); result.pushMap(map); count++
+        }
+      }
+      promise.resolve(result)
+    } catch (e: SecurityException) { promise.reject("GALLERY_PERMISSION", "Android no permitió leer las fotografías.", e) }
+      catch (e: Exception) { promise.reject("GALLERY_READ_FAILED", "No se pudo leer la galería.", e) }
+  }
+
+  @ReactMethod
   fun getStoredSmsMessages(promise: Promise) {
     try {
       val raw = ctx.getSharedPreferences("feros_sms", Context.MODE_PRIVATE).getString("messages", "[]") ?: "[]"
