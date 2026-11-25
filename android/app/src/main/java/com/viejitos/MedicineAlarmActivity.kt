@@ -42,7 +42,7 @@ class MedicineAlarmActivity : Activity() {
     root.addView(button("✓  YA LA TOMÉ", Color.rgb(0,168,107)) { registerTaken() })
     root.addView(button("POSPONER 10 MINUTOS", Color.rgb(49,93,134)) { snooze() })
     setContentView(root)
-    try { ringtone=RingtoneManager.getRingtone(this,RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)); ringtone?.play() } catch (_: Exception) {}
+    try { ringtone=RingtoneManager.getRingtone(this,RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)); ringtone?.play() } catch (_: Exception) {}
     tts=TextToSpeech(this) { status -> if(status==TextToSpeech.SUCCESS){ tts?.language=Locale("es","MX"); tts?.speak("Hora de tomar $name, $dose",TextToSpeech.QUEUE_FLUSH,null,"feros-medicine") } }
   }
   private fun dp(value:Int)=(value*resources.displayMetrics.density).toInt()
