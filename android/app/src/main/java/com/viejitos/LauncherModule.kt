@@ -371,6 +371,19 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
   }
 
   @ReactMethod
+  fun shareImageToWhatsApp(uriString: String, promise: Promise) {
+    try {
+      val uri = Uri.parse(uriString)
+      val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/*"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        setPackage("com.whatsapp")
+      }
+      if (intent.resolveActivity(ctx.packageManager) == null) { promise.resolve(false); return }
+      launch(intent); promise.resolve(true)
+    } catch (e: Exception) { promise.reject("WHATSAPP_SHARE_FAILED", "No se pudo compartir la fotografía por WhatsApp.", e) }
+  }
+
+  @ReactMethod
   fun getGalleryImages(limit: Int, promise: Promise) {
     val permission = if (Build.VERSION.SDK_INT >= 33) "android.permission.READ_MEDIA_IMAGES" else Manifest.permission.READ_EXTERNAL_STORAGE
     if (ContextCompat.checkSelfPermission(ctx, permission) != PackageManager.PERMISSION_GRANTED) {
