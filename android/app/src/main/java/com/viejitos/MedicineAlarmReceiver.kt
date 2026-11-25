@@ -17,6 +17,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
     val name = intent.getStringExtra("medicine_name") ?: "tu medicina"
     val dose = intent.getStringExtra("medicine_dose") ?: ""
     val photo = intent.getStringExtra("medicine_photo")
+    val daysJson = intent.getStringExtra("days_json") ?: "[]"
     val channelId = "feros_medicine_alarm"
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (Build.VERSION.SDK_INT >= 26) {
@@ -28,7 +29,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
     val open = Intent(context, MedicineAlarmActivity::class.java).apply {
       flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
       putExtra("reminder_id", id); putExtra("medicine_name", name)
-      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo)
+      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson)
     }
     val pi = PendingIntent.getActivity(context, id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     val notification = NotificationCompat.Builder(context, channelId)
@@ -41,11 +42,39 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       .setFullScreenIntent(pi, true)
       .setContentIntent(pi).setAutoCancel(true).build()
     try { NotificationManagerCompat.from(context).notify(id.hashCode(), notification) } catch (_: SecurityException) {}
+    scheduleNext(context, id, name, dose, photo, daysJson)
     try { context.startActivity(open) } catch (_: Exception) {}
   }
 
   companion object {
-    fun schedule(context: Context, id: String, name: String, dose: String, at: Long, photo: String?): Boolean {
+    private fun scheduleNext(context: Context, id: String, name: String, dose: String, photo: String?, daysJson: String) {
+      try {
+        val days = org.json.JSONArray(daysJson)
+        if (days.length() == 0) return
+        val now = java.util.Calendar.getInstance()
+        val target = java.util.Calendar.getInstance()
+        var found = false
+        for (offset in 1..7) {
+          target.timeInMillis = now.timeInMillis
+          target.add(java.util.Calendar.DAY_OF_YEAR, offset)
+          val weekday = target.get(java.util.Calendar.DAY_OF_WEEK) - 1
+          var matches = false
+          for (i in 0 until days.length()) if (days.optInt(i, -1) == weekday) matches = true
+          if (matches) { found = true; break }
+        }
+        if (found) {
+          val prefs = context.getSharedPreferences("feros_medicine", Context.MODE_PRIVATE)
+          val times = try { org.json.JSONObject(prefs.getString("times", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+          val saved = times.optJSONObject(id)
+          if (saved != null) { target.set(java.util.Calendar.HOUR_OF_DAY, saved.optInt("hour", 8)); target.set(java.util.Calendar.MINUTE, saved.optInt("minute", 0)) }
+          target.set(java.util.Calendar.SECOND, 0); target.set(java.util.Calendar.MILLISECOND, 0)
+          if (target.timeInMillis <= now.timeInMillis) target.add(java.util.Calendar.DAY_OF_YEAR, 7)
+          schedule(context, id, name, dose, target.timeInMillis, photo, daysJson)
+        }
+      } catch (_: Exception) {}
+    }
+
+    fun schedule(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String = "[]"): Boolean {
       val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
       if (Build.VERSION.SDK_INT >= 31 && !alarm.canScheduleExactAlarms()) return false
       val intent = Intent(context, MedicineAlarmReceiver::class.java).apply {
