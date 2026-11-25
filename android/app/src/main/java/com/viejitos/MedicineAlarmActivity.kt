@@ -66,7 +66,7 @@ class MedicineAlarmActivity : Activity() {
   private fun snooze(){
     stopAlarm()
     val at=System.currentTimeMillis()+10*60*1000L
-    MedicineAlarmReceiver.schedule(this,id,name,dose,at,intent.getStringExtra("medicine_photo"),intent.getStringExtra("days_json") ?: "[]")
+    MedicineAlarmReceiver.scheduleSnooze(this,id,name,dose,at,intent.getStringExtra("medicine_photo"),intent.getStringExtra("days_json") ?: "[]")
     finish()
   }
   override fun onDestroy(){stopAlarm();try{tts?.shutdown()}catch(_:Exception){};super.onDestroy()}
