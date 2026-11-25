@@ -18,6 +18,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
     val dose = intent.getStringExtra("medicine_dose") ?: ""
     val photo = intent.getStringExtra("medicine_photo")
     val daysJson = intent.getStringExtra("days_json") ?: "[]"
+    val kind = intent.getStringExtra("reminder_kind") ?: "medicine"
     val channelId = "feros_medicine_alarm"
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (Build.VERSION.SDK_INT >= 26) {
@@ -29,12 +30,12 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
     val open = Intent(context, MedicineAlarmActivity::class.java).apply {
       flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
       putExtra("reminder_id", id); putExtra("medicine_name", name)
-      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson)
+      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson); putExtra("reminder_kind", kind)
     }
     val pi = PendingIntent.getActivity(context, id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     val notification = NotificationCompat.Builder(context, channelId)
       .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-      .setContentTitle("Hora de tomar $name")
+      .setContentTitle(if (kind == "appointment") "Hora de tu cita: $name" else "Hora de tomar $name")
       .setContentText(dose)
       .setCategory(NotificationCompat.CATEGORY_ALARM)
       .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -42,12 +43,12 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       .setFullScreenIntent(pi, true)
       .setContentIntent(pi).setAutoCancel(true).build()
     try { NotificationManagerCompat.from(context).notify(id.hashCode(), notification) } catch (_: SecurityException) {}
-    scheduleNext(context, id, name, dose, photo, daysJson)
+    scheduleNext(context, id, name, dose, photo, daysJson, kind)
     try { context.startActivity(open) } catch (_: Exception) {}
   }
 
   companion object {
-    private fun scheduleNext(context: Context, id: String, name: String, dose: String, photo: String?, daysJson: String) {
+    private fun scheduleNext(context: Context, id: String, name: String, dose: String, photo: String?, daysJson: String, kind: String) {
       try {
         val days = org.json.JSONArray(daysJson)
         if (days.length() == 0) return
@@ -69,17 +70,17 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
           if (saved != null) { target.set(java.util.Calendar.HOUR_OF_DAY, saved.optInt("hour", 8)); target.set(java.util.Calendar.MINUTE, saved.optInt("minute", 0)) }
           target.set(java.util.Calendar.SECOND, 0); target.set(java.util.Calendar.MILLISECOND, 0)
           if (target.timeInMillis <= now.timeInMillis) target.add(java.util.Calendar.DAY_OF_YEAR, 7)
-          schedule(context, id, name, dose, target.timeInMillis, photo, daysJson)
+          schedule(context, id, name, dose, target.timeInMillis, photo, daysJson, kind)
         }
       } catch (_: Exception) {}
     }
 
-    fun scheduleSnooze(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String) {
+    fun scheduleSnooze(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String, kind: String) {
       val alarm=context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
       if(Build.VERSION.SDK_INT>=31&&!alarm.canScheduleExactAlarms())return
       val intent=Intent(context,MedicineAlarmReceiver::class.java).apply {
         putExtra("reminder_id",id);putExtra("medicine_name",name);putExtra("medicine_dose",dose)
-        putExtra("medicine_photo",photo);putExtra("days_json",daysJson)
+        putExtra("medicine_photo",photo);putExtra("days_json",daysJson);putExtra("reminder_kind",kind)
       }
       val pi=PendingIntent.getBroadcast(context,id.hashCode(),intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
       alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi)
@@ -99,7 +100,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       prefs.edit().putString("alarms",alarms.toString()).putString("times",times.toString()).apply()
     }
 
-    fun schedule(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String = "[]"): Boolean {
+    fun schedule(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String = "[]", kind: String = "medicine"): Boolean {
       val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
       if (Build.VERSION.SDK_INT >= 31 && !alarm.canScheduleExactAlarms()) return false
       val clock = java.util.Calendar.getInstance().apply { timeInMillis = at }
@@ -108,7 +109,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       times.put(id, org.json.JSONObject().put("hour", clock.get(java.util.Calendar.HOUR_OF_DAY)).put("minute", clock.get(java.util.Calendar.MINUTE)))
       prefs.edit().putString("times", times.toString()).apply()
       val alarms = try { org.json.JSONObject(prefs.getString("alarms", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
-      alarms.put(id, org.json.JSONObject().put("name", name).put("dose", dose).put("at", at).put("photo", photo).put("days", daysJson))
+      alarms.put(id, org.json.JSONObject().put("name", name).put("dose", dose).put("at", at).put("photo", photo).put("days", daysJson).put("kind", kind))
       prefs.edit().putString("alarms", alarms.toString()).apply()
       val intent = Intent(context, MedicineAlarmReceiver::class.java).apply {
         putExtra("reminder_id", id); putExtra("medicine_name", name)
