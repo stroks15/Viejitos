@@ -1,5 +1,5 @@
 import React, {useRef} from 'react';
-import IconPack3D,{FerIconName} from './IconPack3D';
+import IconPack3D,{type FerIconName} from './IconPack3D';
 import {Image, Pressable, StyleSheet, Text, Animated, Vibration, View} from 'react-native';
 type Props={label:string;glyph:string;color:string;icon?:string;iconName?:FerIconName;onPress:()=>void;onSpeak?:()=>void;large?:boolean};
 export default function SoftAppCard({label,glyph,color,icon,iconName,onPress,onSpeak,large=false}:Props){
