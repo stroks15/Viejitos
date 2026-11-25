@@ -29,7 +29,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
     val open = Intent(context, MedicineAlarmActivity::class.java).apply {
       flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
       putExtra("reminder_id", id); putExtra("medicine_name", name)
-      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson); putExtra("days_json", daysJson)
+      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson)
     }
     val pi = PendingIntent.getActivity(context, id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     val notification = NotificationCompat.Builder(context, channelId)
@@ -74,6 +74,17 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       } catch (_: Exception) {}
     }
 
+    fun scheduleSnooze(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String) {
+      val alarm=context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+      if(Build.VERSION.SDK_INT>=31&&!alarm.canScheduleExactAlarms())return
+      val intent=Intent(context,MedicineAlarmReceiver::class.java).apply {
+        putExtra("reminder_id",id);putExtra("medicine_name",name);putExtra("medicine_dose",dose)
+        putExtra("medicine_photo",photo);putExtra("days_json",daysJson)
+      }
+      val pi=PendingIntent.getBroadcast(context,id.hashCode(),intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+      alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi)
+    }
+
     fun cancel(context: Context, id: String) {
       val intent = Intent(context, MedicineAlarmReceiver::class.java)
       val pi = PendingIntent.getBroadcast(context, id.hashCode(), intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
@@ -101,7 +112,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       prefs.edit().putString("alarms", alarms.toString()).apply()
       val intent = Intent(context, MedicineAlarmReceiver::class.java).apply {
         putExtra("reminder_id", id); putExtra("medicine_name", name)
-        putExtra("medicine_dose", dose); putExtra("medicine_photo", photo)
+        putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson)
       }
       val pi = PendingIntent.getBroadcast(context, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
       alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
