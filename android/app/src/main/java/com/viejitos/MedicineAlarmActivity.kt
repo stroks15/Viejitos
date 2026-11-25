@@ -16,6 +16,7 @@ import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.util.Locale
@@ -32,6 +33,8 @@ class MedicineAlarmActivity : Activity() {
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
     val root = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER; setPadding(28,32,28,32); setBackgroundColor(Color.rgb(7,19,36)) }
     root.addView(TextView(this).apply { text="¡ES HORA!"; textSize=28f; setTextColor(Color.WHITE); typeface=Typeface.DEFAULT_BOLD; gravity=Gravity.CENTER })
+    val photo = intent.getStringExtra("medicine_photo")
+    if (!photo.isNullOrBlank()) { try { root.addView(ImageView(this).apply { setImageURI(android.net.Uri.parse(photo)); scaleType=ImageView.ScaleType.FIT_CENTER }, LinearLayout.LayoutParams(-1, dp(150))) } catch (_: Exception) {} }
     root.addView(TextView(this).apply { text=name; textSize=38f; setTextColor(Color.WHITE); typeface=Typeface.DEFAULT_BOLD; gravity=Gravity.CENTER; setPadding(0,28,0,12) })
     root.addView(TextView(this).apply { text=dose; textSize=27f; setTextColor(Color.rgb(205,230,245)); gravity=Gravity.CENTER; setPadding(0,0,0,36) })
     root.addView(button("✓  YA LA TOMÉ", Color.rgb(0,168,107)) { registerTaken() })
@@ -40,6 +43,7 @@ class MedicineAlarmActivity : Activity() {
     try { ringtone=RingtoneManager.getRingtone(this,RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)); ringtone?.play() } catch (_: Exception) {}
     tts=TextToSpeech(this) { status -> if(status==TextToSpeech.SUCCESS){ tts?.language=Locale("es","MX"); tts?.speak("Hora de tomar $name, $dose",TextToSpeech.QUEUE_FLUSH,null,"feros-medicine") } }
   }
+  private fun dp(value:Int)=(value*resources.displayMetrics.density).toInt()
   private fun button(label:String,color:Int,action:()->Unit)=Button(this).apply {
     text=label; textSize=21f; setTextColor(Color.WHITE); isAllCaps=false; typeface=Typeface.DEFAULT_BOLD
     background=GradientDrawable().apply { cornerRadius=48f; setColor(color) }
@@ -60,7 +64,7 @@ class MedicineAlarmActivity : Activity() {
   private fun snooze(){
     stopAlarm()
     val at=System.currentTimeMillis()+10*60*1000L
-    MedicineAlarmReceiver.schedule(this,id,name,dose,at,intent.getStringExtra("medicine_photo"))
+    MedicineAlarmReceiver.schedule(this,id,name,dose,at,intent.getStringExtra("medicine_photo"),intent.getStringExtra("days_json") ?: "[]")
     finish()
   }
   override fun onDestroy(){stopAlarm();try{tts?.shutdown()}catch(_:Exception){};super.onDestroy()}
