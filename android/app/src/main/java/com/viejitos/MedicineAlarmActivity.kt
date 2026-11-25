@@ -29,6 +29,7 @@ class MedicineAlarmActivity : Activity() {
   private val id get() = intent.getStringExtra("reminder_id") ?: "medicine"
   private val name get() = intent.getStringExtra("medicine_name") ?: "tu medicina"
   private val dose get() = intent.getStringExtra("medicine_dose") ?: ""
+  private val kind get() = intent.getStringExtra("reminder_kind") ?: "medicine"
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
@@ -39,11 +40,11 @@ class MedicineAlarmActivity : Activity() {
     if (!photo.isNullOrBlank()) { try { root.addView(ImageView(this).apply { setImageURI(android.net.Uri.parse(photo)); scaleType=ImageView.ScaleType.FIT_CENTER }, LinearLayout.LayoutParams(-1, dp(150))) } catch (_: Exception) {} }
     root.addView(TextView(this).apply { text=name; textSize=38f; setTextColor(Color.WHITE); typeface=Typeface.DEFAULT_BOLD; gravity=Gravity.CENTER; setPadding(0,28,0,12) })
     root.addView(TextView(this).apply { text=dose; textSize=27f; setTextColor(Color.rgb(205,230,245)); gravity=Gravity.CENTER; setPadding(0,0,0,36) })
-    root.addView(button("✓  YA LA TOMÉ", Color.rgb(0,168,107)) { registerTaken() })
+    root.addView(button(if (kind == "appointment") "✓  YA FUI A LA CITA" else "✓  YA LA TOMÉ", Color.rgb(0,168,107)) { registerTaken() })
     root.addView(button("POSPONER 10 MINUTOS", Color.rgb(49,93,134)) { snooze() })
     setContentView(root)
     try { ringtone=RingtoneManager.getRingtone(this,RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)); ringtone?.play() } catch (_: Exception) {}
-    tts=TextToSpeech(this) { status -> if(status==TextToSpeech.SUCCESS){ tts?.language=Locale("es","MX"); tts?.speak("Hora de tomar $name, $dose",TextToSpeech.QUEUE_FLUSH,null,"feros-medicine") } }
+    tts=TextToSpeech(this) { status -> if(status==TextToSpeech.SUCCESS){ tts?.language=Locale("es","MX"); tts?.speak(if (kind == "appointment") "Es hora de tu cita: $name. $dose" else "Hora de tomar $name, $dose",TextToSpeech.QUEUE_FLUSH,null,"feros-medicine") } }
   }
   private fun dp(value:Int)=(value*resources.displayMetrics.density).toInt()
   private fun button(label:String,color:Int,action:()->Unit)=Button(this).apply {
@@ -66,7 +67,7 @@ class MedicineAlarmActivity : Activity() {
   private fun snooze(){
     stopAlarm()
     val at=System.currentTimeMillis()+10*60*1000L
-    MedicineAlarmReceiver.scheduleSnooze(this,id,name,dose,at,intent.getStringExtra("medicine_photo"),intent.getStringExtra("days_json") ?: "[]")
+    MedicineAlarmReceiver.scheduleSnooze(this,id,name,dose,at,intent.getStringExtra("medicine_photo"),intent.getStringExtra("days_json") ?: "[]",kind)
     finish()
   }
   override fun onDestroy(){stopAlarm();try{tts?.shutdown()}catch(_:Exception){};super.onDestroy()}
