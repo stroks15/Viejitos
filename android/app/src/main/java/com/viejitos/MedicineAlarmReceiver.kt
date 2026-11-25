@@ -29,7 +29,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
     val open = Intent(context, MedicineAlarmActivity::class.java).apply {
       flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
       putExtra("reminder_id", id); putExtra("medicine_name", name)
-      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson)
+      putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson); putExtra("days_json", daysJson)
     }
     val pi = PendingIntent.getActivity(context, id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     val notification = NotificationCompat.Builder(context, channelId)
