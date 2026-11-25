@@ -82,6 +82,9 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       val times = try { org.json.JSONObject(prefs.getString("times", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
       times.put(id, org.json.JSONObject().put("hour", clock.get(java.util.Calendar.HOUR_OF_DAY)).put("minute", clock.get(java.util.Calendar.MINUTE)))
       prefs.edit().putString("times", times.toString()).apply()
+      val alarms = try { org.json.JSONObject(prefs.getString("alarms", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+      alarms.put(id, org.json.JSONObject().put("name", name).put("dose", dose).put("at", at).put("photo", photo).put("days", daysJson))
+      prefs.edit().putString("alarms", alarms.toString()).apply()
       val intent = Intent(context, MedicineAlarmReceiver::class.java).apply {
         putExtra("reminder_id", id); putExtra("medicine_name", name)
         putExtra("medicine_dose", dose); putExtra("medicine_photo", photo)
