@@ -3,6 +3,9 @@ package com.viejitos
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.speech.RecognizerIntent
+import android.app.Activity
+import com.facebook.react.bridge.ActivityEventListener
 import android.content.pm.PackageManager
 import android.app.role.RoleManager
 import android.telecom.TelecomManager
@@ -95,7 +98,18 @@ object LauncherEvents {
 }
 
 class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
+  private var speechPromise: Promise? = null
   init {
+    ctx.addActivityEventListener(object : ActivityEventListener {
+      override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != 4311) return
+        val promise = speechPromise ?: return
+        speechPromise = null
+        if (resultCode == Activity.RESULT_OK) promise.resolve(data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "")
+        else promise.resolve("")
+      }
+      override fun onNewIntent(intent: Intent?) {}
+    })
     LauncherEvents.reactContext = ctx
     LauncherEvents.ensureTorchTracking(ctx)
     SpeechController.initialize(ctx)
@@ -105,6 +119,21 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
 
   override fun onCatalystInstanceDestroy() {
     super.onCatalystInstanceDestroy()
+  }
+
+  @ReactMethod
+  fun startSpeechRecognition(promise: Promise) {
+    try {
+      if (speechPromise != null) { promise.reject("SPEECH_BUSY", "Ya hay un dictado en curso."); return }
+      val activity = ctx.currentActivity ?: run { promise.reject("NO_ACTIVITY", "Abre FerOs para usar el dictado."); return }
+      val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+        putExtra(RecognizerIntent.EXTRA_PROMPT, "Di el nombre del producto")
+      }
+      speechPromise = promise
+      activity.startActivityForResult(intent, 4311)
+    } catch (e: Exception) { speechPromise = null; promise.reject("SPEECH_UNAVAILABLE", "El dictado por voz no está disponible.", e) }
   }
 
   @ReactMethod
