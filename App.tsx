@@ -7,10 +7,10 @@ import SoftAppCard from './src/components/SoftAppCard';
 import QuickControls from './src/screens/QuickControls';
 import SmsInbox from './src/screens/SmsInbox';
 import UnifiedInbox from './src/screens/UnifiedInbox';
-import MedicineReminders,{Reminder} from './src/screens/MedicineReminders';
+import MedicineReminders,{type Reminder} from './src/screens/MedicineReminders';
 import PhotoGallery from './src/screens/PhotoGallery';
 import ShoppingList from './src/screens/ShoppingList';
-import {FerIconName} from './src/components/IconPack3D';
+import {type FerIconName} from './src/components/IconPack3D';
 import type {SmsMessage} from './src/types/family';
 
 type Video={videoId:string;title:string;publishedAt:string;thumbnail:string};
@@ -380,7 +380,7 @@ export default function App(){
   <Modal visible={activeFeature!==null} animationType="slide" onRequestClose={()=>setActiveFeature(null)}>
    <View style={{flex:1,backgroundColor:'#EEF5FA',paddingTop:insets.top+8}}>
     <View style={{flexDirection:'row',alignItems:'center',padding:12,backgroundColor:'#DCEEFF'}}><TouchableOpacity onPress={()=>setActiveFeature(null)} style={{padding:12,backgroundColor:'#315D86',borderRadius:12}}><Text style={{color:'#FFF',fontSize:18,fontWeight:'900'}}>← VOLVER</Text></TouchableOpacity><Text style={{fontSize:22,fontWeight:'900',color:'#17354B',marginLeft:14}}>{activeFeature==='medicine'?'MEDICINAS Y CITAS':activeFeature==='shopping'?'LISTA DE COMPRAS':'GALERÍA DE FOTOS'}</Text></View>
-    {activeFeature==='medicine'?<MedicineReminders schedule={async(r:Reminder)=>{try{const granted=await Launcher?.requestExactAlarmPermission?.();if(granted===false){Alert.alert('Permiso necesario','Activa “Alarmas y recordatorios” para FerOs y vuelve a guardar el recordatorio.');return false;}const now=new Date();let target=new Date(now);target.setHours(r.hour,r.minute,0,0);let found=false;for(let d=0;d<8;d++){const candidate=new Date(now);candidate.setDate(now.getDate()+d);candidate.setHours(r.hour,r.minute,0,0);if((r.days.length===0||r.days.includes(candidate.getDay()))&&candidate.getTime()>now.getTime()){target=candidate;found=true;break;}}if(!found)target.setDate(target.getDate()+1);return await Launcher?.scheduleMedicineAlarm?.(r.id,r.name,r.dose,target.getTime(),r.photo,JSON.stringify(r.days))||false;}catch{return false;}}} loadHistory={async()=>await Launcher?.getMedicineHistory?.()||[]} onCancel={async id=>{await Launcher?.cancelMedicineAlarm?.(id);}} onPickPhoto={()=>setActiveFeature('gallery-pick')} photoUri={medicinePhotoDraft}/>:null}
+    {activeFeature==='medicine'?<MedicineReminders schedule={async(r:Reminder)=>{try{if(Platform.OS==='android'&&Platform.Version>=33){const notif=await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS' as any);if(notif!==PermissionsAndroid.RESULTS.GRANTED)Alert.alert('Notificaciones','Permite las notificaciones para mostrar la alarma en pantalla completa.');}const granted=await Launcher?.requestExactAlarmPermission?.();if(granted===false){Alert.alert('Permiso necesario','Activa “Alarmas y recordatorios” para FerOs y vuelve a guardar el recordatorio.');return false;}const now=new Date();let target=new Date(now);target.setHours(r.hour,r.minute,0,0);let found=false;for(let d=0;d<8;d++){const candidate=new Date(now);candidate.setDate(now.getDate()+d);candidate.setHours(r.hour,r.minute,0,0);if((r.days.length===0||r.days.includes(candidate.getDay()))&&candidate.getTime()>now.getTime()){target=candidate;found=true;break;}}if(!found)target.setDate(target.getDate()+1);return await Launcher?.scheduleMedicineAlarm?.(r.id,r.name,r.dose,target.getTime(),r.photo,JSON.stringify(r.days))||false;}catch{return false;}}} loadHistory={async()=>await Launcher?.getMedicineHistory?.()||[]} onCancel={async id=>{await Launcher?.cancelMedicineAlarm?.(id);}} onPickPhoto={()=>setActiveFeature('gallery-pick')} photoUri={medicinePhotoDraft}/>:null}
     {activeFeature==='gallery'?<PhotoGallery/>:null}
     {activeFeature==='gallery-pick'?<PhotoGallery selectMode onChoose={uri=>{setMedicinePhotoDraft(uri);setActiveFeature('medicine');}}/>:null}
     {activeFeature==='shopping'?<ShoppingList onSpeak={s=>{if(voice)say(s);}} onDictate={async()=>await Launcher?.startSpeechRecognition?.()||''}/>:null}
