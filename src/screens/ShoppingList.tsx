@@ -4,11 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type Item={id:string;name:string;qty:number;price:number;bought:boolean};
 const KEY='feros.shopping.v1';
 export default function ShoppingList({onSpeak,onDictate}:{onSpeak?:(s:string)=>void;onDictate?:()=>Promise<string>}){
- const [budget,setBudget]=useState('500'),[items,setItems]=useState<Item[]>([]),[name,setName]=useState(''),[qty,setQty]=useState(1),[price,setPrice]=useState('0');
+ const [budget,setBudget]=useState('500'),[items,setItems]=useState<Item[]>([]),[name,setName]=useState(''),[qty,setQty]=useState(1),[price,setPrice]=useState('0'),[loaded,setLoaded]=useState(false);
  const [editingId,setEditingId]=useState<string|null>(null),[editQty,setEditQty]=useState('1'),[editPrice,setEditPrice]=useState('0');
  const warned=useRef(false);
- useEffect(()=>{(async()=>{try{const raw=await AsyncStorage.getItem(KEY);if(raw){const v=JSON.parse(raw);if(Array.isArray(v.items))setItems(v.items);if(typeof v.budget==='string')setBudget(v.budget);}}catch{setItems([]);}})();},[]);
- useEffect(()=>{AsyncStorage.setItem(KEY,JSON.stringify({budget,items})).catch(()=>{});},[budget,items]);
+ useEffect(()=>{(async()=>{try{const raw=await AsyncStorage.getItem(KEY);if(raw){const v=JSON.parse(raw);if(Array.isArray(v.items))setItems(v.items);if(typeof v.budget==='string')setBudget(v.budget);}}catch{setItems([]);}finally{setLoaded(true);}})();},[]);
+ useEffect(()=>{if(loaded)AsyncStorage.setItem(KEY,JSON.stringify({budget,items})).catch(()=>{});},[loaded,budget,items]);
  const total=useMemo(()=>items.filter(x=>x.bought).reduce((sum,x)=>sum+x.qty*x.price,0),[items]);
  const limit=Math.max(0,Number(budget)||0),remaining=limit-total,subtotal=qty*Math.max(0,Number(price)||0);
  useEffect(()=>{if(remaining<0&&!warned.current){warned.current=true;onSpeak?.('Cuidado, ya pasaste tu presupuesto');}if(remaining>=0)warned.current=false;},[remaining]);
