@@ -384,6 +384,12 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
   }
 
   @ReactMethod
+  fun cancelMedicineAlarm(id: String, promise: Promise) {
+    try { MedicineAlarmReceiver.cancel(ctx, id); promise.resolve(true) }
+    catch (e: Exception) { promise.reject("MEDICINE_CANCEL_FAILED", "No se pudo cancelar el recordatorio.", e) }
+  }
+
+  @ReactMethod
   fun getMedicineHistory(promise: Promise) {
     try {
       val raw = ctx.getSharedPreferences("feros_medicine", Context.MODE_PRIVATE).getString("history", "[]") ?: "[]"
