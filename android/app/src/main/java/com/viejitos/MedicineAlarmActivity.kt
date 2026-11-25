@@ -12,6 +12,8 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.WindowManager
@@ -59,7 +61,7 @@ class MedicineAlarmActivity : Activity() {
     arr.put(org.json.JSONObject().put("id",System.currentTimeMillis().toString()).put("reminderId",id).put("name",name).put("dose",dose).put("at",System.currentTimeMillis()))
     prefs.edit().putString("history",arr.toString()).apply()
     tts?.speak("Listo, registrado",TextToSpeech.QUEUE_FLUSH,null,"feros-recorded")
-    finish()
+    Handler(Looper.getMainLooper()).postDelayed({ if (!isFinishing) finish() }, 1400)
   }
   private fun snooze(){
     stopAlarm()
