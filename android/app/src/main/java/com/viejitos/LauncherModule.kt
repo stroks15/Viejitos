@@ -378,6 +378,17 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
   }
 
   @ReactMethod
+  fun requestFullScreenAlarmPermission(promise: Promise) {
+    try {
+      if (Build.VERSION.SDK_INT < 34) { promise.resolve(true); return }
+      val manager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+      if (manager.canUseFullScreenIntent()) { promise.resolve(true); return }
+      val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      ctx.startActivity(intent); promise.resolve(false)
+    } catch (e: Exception) { promise.reject("FULL_SCREEN_PERMISSION", "No se pudo abrir el permiso de pantalla completa.", e) }
+  }
+
+  @ReactMethod
   fun scheduleMedicineAlarm(id: String, name: String, dose: String, at: Double, photo: String?, daysJson: String, kind: String, promise: Promise) {
     try { promise.resolve(MedicineAlarmReceiver.schedule(ctx, id, name, dose, at.toLong(), photo, daysJson, kind)) }
     catch (e: Exception) { promise.reject("MEDICINE_ALARM_FAILED", "No se pudo programar la alarma.", e) }
