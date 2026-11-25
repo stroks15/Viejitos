@@ -112,7 +112,7 @@ class CallActivity : Activity(), SensorEventListener {
   fun finishAfterDisconnect(){timer?.let(handler::removeCallbacks);handler.postDelayed({if(!isFinishing)finish()},650)}
   private fun announceIncoming(state:Int){if(state!=Call.STATE_RINGING)return
     if(!getSharedPreferences("feros_settings",Context.MODE_PRIVATE).getBoolean("call_voice_enabled",true))return
-    val contact=nameView.text.toString()
+    val contact=if(intent.getBooleanExtra(EXTRA_UNKNOWN,false)) "Número desconocido" else nameView.text.toString()
     tts=TextToSpeech(this){status->if(status==TextToSpeech.SUCCESS){tts?.language=Locale("es","MX");tts?.setSpeechRate(1.0f);tts?.speak("Llamada entrante de $contact",TextToSpeech.QUEUE_FLUSH,null,"feros-incoming-call")}}
   }
   override fun onSensorChanged(event:SensorEvent){if(event.sensor.type!=Sensor.TYPE_PROXIMITY)return;val max=event.sensor.maximumRange;val isNear=event.values[0]<max
