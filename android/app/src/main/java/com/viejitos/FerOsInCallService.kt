@@ -12,10 +12,12 @@ import android.telecom.VideoProfile
 class FerOsInCallService : InCallService() {
   private var previousRingVolume: Int? = null
 
-  private fun applyRingtoneProtection() {
+  private fun applyRingtoneProtection(number: String) {
     val enabled = getSharedPreferences("feros_settings", MODE_PRIVATE)
       .getBoolean("ringtone_protection", false)
-    if (!enabled || previousRingVolume != null) return
+    val key = number.filter { it.isDigit() }
+    val relations = try { org.json.JSONObject(getSharedPreferences("feros_settings", MODE_PRIVATE).getString("contact_relationships", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+    if (!enabled || key.isBlank() || !relations.has(key) || previousRingVolume != null) return
     try {
       val audio = getSystemService(AUDIO_SERVICE) as AudioManager
       previousRingVolume = audio.getStreamVolume(AudioManager.STREAM_RING)
@@ -36,10 +38,12 @@ class FerOsInCallService : InCallService() {
   override fun onCallAdded(call: Call) {
     super.onCallAdded(call)
     CallManager.attach(this, call)
+    val incomingNumber = call.details.handle?.schemeSpecificPart ?: ""
+    if (call.state == Call.STATE_RINGING) applyRingtoneProtection(incomingNumber)
     call.registerCallback(object : Call.Callback() {
       override fun onStateChanged(changedCall: Call, state: Int) {
         CallManager.updateState(state)
-        if (state == Call.STATE_RINGING) applyRingtoneProtection()
+        if (state == Call.STATE_RINGING) applyRingtoneProtection(incomingNumber)
         if (state == Call.STATE_DISCONNECTED || state == Call.STATE_DISCONNECTING) restoreRingtoneVolume()
         CallActivity.current?.renderCallState(state)
         if (state == Call.STATE_DISCONNECTED || state == Call.STATE_DISCONNECTING) {
@@ -56,6 +60,7 @@ class FerOsInCallService : InCallService() {
       putExtra(CallActivity.EXTRA_NAME, contact.first)
       putExtra(CallActivity.EXTRA_NUMBER, call.details.handle?.schemeSpecificPart ?: "")
       putExtra(CallActivity.EXTRA_PHOTO, contact.second)
+      putExtra(CallActivity.EXTRA_RELATIONSHIP, contact.third)
       putExtra(CallActivity.EXTRA_STATE, call.state)
       putExtra(CallActivity.EXTRA_UNKNOWN, contact.first.isBlank() || contact.first == (call.details.handle?.schemeSpecificPart ?: ""))
     }
@@ -71,8 +76,8 @@ class FerOsInCallService : InCallService() {
     CallActivity.current?.finishAfterDisconnect()
   }
 
-  private fun lookupContact(handle: Uri?): Pair<String, String?> {
-    val number = handle?.schemeSpecificPart ?: return Pair("", null)
+  private fun lookupContact(handle: Uri?): Triple<String, String?, String> {
+    val number = handle?.schemeSpecificPart ?: return Triple("", null, "")
     return try {
       val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number))
       contentResolver.query(uri,
@@ -81,12 +86,14 @@ class FerOsInCallService : InCallService() {
         if (cursor.moveToFirst()) {
           val name = cursor.getString(0) ?: number
           val photo = if (!cursor.isNull(1)) cursor.getString(1) else null
-          return Pair(name, photo)
+          val key = number.filter { it.isDigit() }
+          val relations = try { org.json.JSONObject(getSharedPreferences("feros_settings", MODE_PRIVATE).getString("contact_relationships", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+          return Triple(name, photo, relations.optString(key, ""))
         }
       }
-      Pair(number, null)
-    } catch (_: SecurityException) { Pair(number, null) }
-      catch (_: Exception) { Pair(number, null) }
+      Triple(number, null, "")
+    } catch (_: SecurityException) { Triple(number, null, "") }
+      catch (_: Exception) { Triple(number, null, "") }
   }
 }
 
