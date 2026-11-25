@@ -108,7 +108,7 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
         if (resultCode == Activity.RESULT_OK) promise.resolve(data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: "")
         else promise.resolve("")
       }
-      override fun onNewIntent(intent: Intent?) {}
+      override fun onNewIntent(intent: Intent) {}
     })
     LauncherEvents.reactContext = ctx
     LauncherEvents.ensureTorchTracking(ctx)
