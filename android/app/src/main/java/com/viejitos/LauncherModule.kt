@@ -349,8 +349,8 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
   }
 
   @ReactMethod
-  fun scheduleMedicineAlarm(id: String, name: String, dose: String, at: Double, photo: String?, promise: Promise) {
-    try { promise.resolve(MedicineAlarmReceiver.schedule(ctx, id, name, dose, at.toLong(), photo)) }
+  fun scheduleMedicineAlarm(id: String, name: String, dose: String, at: Double, photo: String?, daysJson: String, promise: Promise) {
+    try { promise.resolve(MedicineAlarmReceiver.schedule(ctx, id, name, dose, at.toLong(), photo, daysJson)) }
     catch (e: Exception) { promise.reject("MEDICINE_ALARM_FAILED", "No se pudo programar la alarma.", e) }
   }
 
