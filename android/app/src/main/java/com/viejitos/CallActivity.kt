@@ -61,12 +61,12 @@ class CallActivity : Activity(), SensorEventListener {
     val state=if(CallManager.currentState!=Call.STATE_DISCONNECTED)CallManager.currentState else intent.getIntExtra(EXTRA_STATE,CallManager.currentState)
     renderCallState(state);announceIncoming(state)
   }
-  override fun onNewIntent(intent:android.content.Intent){super.onNewIntent(intent);setIntent(intent);buildUi();handler.postDelayed({touchReady=true;renderCallState(CallManager.currentState)},500);val state=CallManager.currentState;renderCallState(state);announceIncoming(state)}
+  override fun onNewIntent(intent:android.content.Intent){super.onNewIntent(intent);setIntent(intent);touchReady=false;buildUi();handler.postDelayed({touchReady=true;renderCallState(CallManager.currentState)},500);val state=CallManager.currentState;renderCallState(state);announceIncoming(state)}
   private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
   private fun buildUi(){
     val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;setPadding(dp(24),dp(24),dp(24),dp(24));background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(7,19,36),Color.rgb(13,33,61)))}
     titleView=TextView(this).apply{text="Te están llamando";setTextColor(Color.WHITE);textSize=24f;typeface=Typeface.DEFAULT_BOLD;gravity=Gravity.CENTER}
-    avatar=FrameLayout(this).apply{background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(Color.rgb(49,83,111));setStroke(dp(4),Color.rgb(235,245,255));setShadowLayer(dp(10).toFloat(),0f,dp(4).toFloat(),0x66000000)};elevation=dp(9).toFloat()}
+    avatar=FrameLayout(this).apply{background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(Color.rgb(49,83,111));setStroke(dp(4),Color.rgb(235,245,255))};elevation=dp(9).toFloat()}
     val photo=intent.getStringExtra(EXTRA_PHOTO)
     if(!photo.isNullOrBlank()){val image=ImageView(this).apply{scaleType=ImageView.ScaleType.CENTER_CROP;setImageURI(Uri.parse(photo));clipToOutline=true;background=GradientDrawable().apply{shape=GradientDrawable.OVAL}};avatar.addView(image,FrameLayout.LayoutParams(-1,-1))}
     else avatar.addView(TextView(this).apply{text=initials(intent.getStringExtra(EXTRA_NAME)?:intent.getStringExtra(EXTRA_NUMBER).orEmpty());textSize=58f;setTextColor(Color.WHITE);typeface=Typeface.DEFAULT_BOLD;gravity=Gravity.CENTER},FrameLayout.LayoutParams(-1,-1))
@@ -88,7 +88,7 @@ class CallActivity : Activity(), SensorEventListener {
     background=GradientDrawable().apply{cornerRadius=dp(44).toFloat();setColor(color)}
     elevation=dp(7).toFloat();isFocusable=true;contentDescription=label
     layoutParams=LinearLayout.LayoutParams(-1,dp(84)).apply{topMargin=dp(14);bottomMargin=dp(14)}
-    setOnClickListener{val now=System.currentTimeMillis();if(!touchReady||now-lastAction<600||near)return@setOnClickListener;lastAction=now;onClick()}
+    setOnClickListener{val now=System.currentTimeMillis();if(!touchReady||now-lastAction<600||near)return@setOnClickListener;if(label.contains("Colgar")&&answeredAt>0L&&now-answeredAt<1500L)return@setOnClickListener;lastAction=now;onClick()}
   }
   fun renderCallState(state:Int){
     if(!::actions.isInitialized)return
