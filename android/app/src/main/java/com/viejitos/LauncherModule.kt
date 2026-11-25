@@ -108,6 +108,17 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
   }
 
   @ReactMethod
+  fun setRingtoneProtection(enabled: Boolean, promise: Promise) {
+    try {
+      ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE)
+        .edit().putBoolean("ringtone_protection", enabled).apply()
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("RINGTONE_SETTING_FAILED", "No se pudo guardar el protector de timbre.", e)
+    }
+  }
+
+  @ReactMethod
   fun speakSpanish(text: String, promise: Promise) {
     try {
       promise.resolve(SpeechController.speak(text))
