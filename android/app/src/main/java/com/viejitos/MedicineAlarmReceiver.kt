@@ -113,7 +113,7 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       prefs.edit().putString("alarms", alarms.toString()).apply()
       val intent = Intent(context, MedicineAlarmReceiver::class.java).apply {
         putExtra("reminder_id", id); putExtra("medicine_name", name)
-        putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson)
+        putExtra("medicine_dose", dose); putExtra("medicine_photo", photo); putExtra("days_json", daysJson); putExtra("reminder_kind", kind)
       }
       val pi = PendingIntent.getBroadcast(context, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
       alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
