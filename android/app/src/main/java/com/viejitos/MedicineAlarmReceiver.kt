@@ -74,6 +74,20 @@ class MedicineAlarmReceiver : BroadcastReceiver() {
       } catch (_: Exception) {}
     }
 
+    fun cancel(context: Context, id: String) {
+      val intent = Intent(context, MedicineAlarmReceiver::class.java)
+      val pi = PendingIntent.getBroadcast(context, id.hashCode(), intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
+      if (pi != null) {
+        (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pi)
+        pi.cancel()
+      }
+      val prefs=context.getSharedPreferences("feros_medicine",Context.MODE_PRIVATE)
+      val alarms=try{org.json.JSONObject(prefs.getString("alarms","{}") ?: "{}")}catch(_:Exception){org.json.JSONObject()}
+      val times=try{org.json.JSONObject(prefs.getString("times","{}") ?: "{}")}catch(_:Exception){org.json.JSONObject()}
+      alarms.remove(id);times.remove(id)
+      prefs.edit().putString("alarms",alarms.toString()).putString("times",times.toString()).apply()
+    }
+
     fun schedule(context: Context, id: String, name: String, dose: String, at: Long, photo: String?, daysJson: String = "[]"): Boolean {
       val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
       if (Build.VERSION.SDK_INT >= 31 && !alarm.canScheduleExactAlarms()) return false
