@@ -108,6 +108,24 @@ class LauncherModule(private val ctx: ReactApplicationContext) : ReactContextBas
   }
 
   @ReactMethod
+  fun saveContactRelationship(number: String, relationship: String, promise: Promise) {
+    try {
+      val key = number.filter { it.isDigit() }
+      val prefs = ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE)
+      val json = try { org.json.JSONObject(prefs.getString("contact_relationships", "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+      if (key.isNotBlank()) { if (relationship.isBlank()) json.remove(key) else json.put(key, relationship) }
+      prefs.edit().putString("contact_relationships", json.toString()).apply()
+      promise.resolve(true)
+    } catch (e: Exception) { promise.reject("RELATIONSHIP_SAVE", "No se pudo guardar el parentesco.", e) }
+  }
+
+  @ReactMethod
+  fun setAutoSpeakerEnabled(enabled: Boolean, promise: Promise) {
+    try { ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE).edit().putBoolean("auto_speaker", enabled).apply(); promise.resolve(true) }
+    catch (e: Exception) { promise.reject("AUTO_SPEAKER", "No se pudo guardar el altavoz automático.", e) }
+  }
+
+  @ReactMethod
   fun setRingtoneProtection(enabled: Boolean, promise: Promise) {
     try {
       ctx.getSharedPreferences("feros_settings", Context.MODE_PRIVATE)
