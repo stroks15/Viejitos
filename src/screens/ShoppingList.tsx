@@ -3,7 +3,7 @@ import {Alert,ScrollView,Text,TextInput,TouchableOpacity,View} from 'react-nativ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 type Item={id:string;name:string;qty:number;price:number;bought:boolean};
 const KEY='feros.shopping.v1';
-export default function ShoppingList({onSpeak}:{onSpeak?:(s:string)=>void}){
+export default function ShoppingList({onSpeak,onDictate}:{onSpeak?:(s:string)=>void;onDictate?:()=>Promise<string>}){
  const [budget,setBudget]=useState('500'),[items,setItems]=useState<Item[]>([]),[name,setName]=useState(''),[qty,setQty]=useState(1),[price,setPrice]=useState('0');
  const [editingId,setEditingId]=useState<string|null>(null),[editQty,setEditQty]=useState('1'),[editPrice,setEditPrice]=useState('0');
  const warned=useRef(false);
@@ -17,7 +17,7 @@ export default function ShoppingList({onSpeak}:{onSpeak?:(s:string)=>void}){
  return <ScrollView contentContainerStyle={{padding:16}}>
   <Text style={s.heading}>PRESUPUESTO MÁXIMO ($)</Text><TextInput value={budget} onChangeText={setBudget} keyboardType="decimal-pad" style={s.input}/>
   <View style={s.summary}><Text style={s.label}>TOTAL GASTADO</Text><Text style={s.total}>$ {total.toFixed(2)}</Text><Text style={[s.remaining,{color:remaining<0?'#C62828':remaining<limit*.2?'#D97706':'#16834A'}]}>DISPONIBLE: $ {remaining.toFixed(2)}</Text>{remaining<0?<Text style={s.warning}>⚠ CUIDADO, YA PASASTE TU PRESUPUESTO</Text>:null}</View>
-  <Text style={s.heading}>AGREGAR PRODUCTO</Text><TextInput value={name} onChangeText={setName} placeholder="Nombre (ej. Leche)" style={s.input}/>
+  <Text style={s.heading}>AGREGAR PRODUCTO</Text><View style={{flexDirection:"row",gap:8,alignItems:"center"}}><TextInput value={name} onChangeText={setName} placeholder="Nombre (ej. Leche)" style={[s.input,{flex:1}]}/><TouchableOpacity style={s.step} onPress={async()=>{try{const value=await onDictate?.();if(value)setName(value);}catch{Alert.alert("Dictado","No se pudo iniciar el dictado por voz.");}}}><Text style={s.stepText}>🎙</Text></TouchableOpacity></View>
   <Text style={s.label}>PIEZAS</Text><View style={s.row}><TouchableOpacity style={s.step} onPress={()=>setQty(v=>Math.max(1,v-1))}><Text style={s.stepText}>−</Text></TouchableOpacity><Text style={s.qty}>{qty}</Text><TouchableOpacity style={s.step} onPress={()=>setQty(v=>v+1)}><Text style={s.stepText}>＋</Text></TouchableOpacity></View>
   <Text style={s.label}>PRECIO POR PIEZA ($)</Text><TextInput value={price} onChangeText={setPrice} keyboardType="decimal-pad" style={s.input}/><Text style={s.subtotal}>Subtotal: $ {subtotal.toFixed(2)}</Text>
   <TouchableOpacity style={s.add} onPress={add}><Text style={s.addText}>＋ AGREGAR A LA CUENTA</Text></TouchableOpacity>
