@@ -30,7 +30,7 @@ class MedicineBootReceiver : BroadcastReceiver() {
           target.set(Calendar.HOUR_OF_DAY,hour);target.set(Calendar.MINUTE,minute);target.set(Calendar.SECOND,0);target.set(Calendar.MILLISECOND,0)
           if(matches&&target.timeInMillis>now.timeInMillis){found=true;break}
         }
-        if(found)MedicineAlarmReceiver.schedule(context,id,item.optString("name"),item.optString("dose"),target.timeInMillis,item.optString("photo").takeIf{it.isNotBlank()},daysJson)
+        if(found)MedicineAlarmReceiver.schedule(context,id,item.optString("name"),item.optString("dose"),target.timeInMillis,item.optString("photo").takeIf{it.isNotBlank()},daysJson,item.optString("kind","medicine"))
       }
     }catch(_:Exception){}
   }
